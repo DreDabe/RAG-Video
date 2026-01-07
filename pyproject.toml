@@ -1,0 +1,5 @@
+[project]
+name = "digital-garden-chat"
+
+[tool.pyside6-project]
+files = ["main.py", "main.qml"]
