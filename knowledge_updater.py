@@ -51,7 +51,7 @@ class BilibiliPlaylistHandler(BasePlatformHandler):
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 playlist_info = ydl.extract_info(url, download=False)
                 entries = playlist_info.get('entries', [])
-                
+            
             if not entries:
                 self._log("[-] 播放列表为空")
                 return
@@ -60,6 +60,7 @@ class BilibiliPlaylistHandler(BasePlatformHandler):
             
             total = len(entries)
             for idx, entry in enumerate(entries, 1):
+                # 检查是否应该停止
                 if self.should_stop:
                     self._log("[!] 任务已停止")
                     break
@@ -83,6 +84,11 @@ class BilibiliPlaylistHandler(BasePlatformHandler):
     def _process_single_video(self, video_url, video_id, cookie_text):
         """处理单个视频"""
         try:
+            # 检查是否应该停止
+            if self.should_stop:
+                self._log("[!] 任务已停止")
+                return
+            
             dl_opts = {
                 'cookiefile': str(self.cookies_file) if cookie_text else None,
                 'download_archive': str(self.archive_file),
@@ -99,17 +105,42 @@ class BilibiliPlaylistHandler(BasePlatformHandler):
             
             self._log(f"[√] 成功获取标题: {v_title}")
             
+            # 检查是否应该停止
+            if self.should_stop:
+                self._log("[!] 任务已停止")
+                return
+            
             v_file = self._find_video_file(video_id)
             if not v_file:
                 self._log(f"[-] 未找到视频文件: {video_id}")
                 return
             
+            # 检查是否应该停止
+            if self.should_stop:
+                self._log("[!] 任务已停止")
+                return
+            
             raw_text = self._get_transcription(v_file, video_id)
+            
+            # 检查是否应该停止
+            if self.should_stop:
+                self._log("[!] 任务已停止")
+                return
             
             f_dir = self.temp_dir / f"f_{video_id}"
             frames = self._extract_keyframes(v_file, f_dir)
             
+            # 检查是否应该停止
+            if self.should_stop:
+                self._log("[!] 任务已停止")
+                return
+            
             ai_summary = self._analyze_with_ollama(v_title, video_url, raw_text, frames)
+            
+            # 检查是否应该停止
+            if self.should_stop:
+                self._log("[!] 任务已停止")
+                return
             
             if ai_summary:
                 final_data = f"【视频标题】：{v_title} 。【视频链接】：{video_url} 。【详细分析总结】：{ai_summary}"
@@ -117,7 +148,17 @@ class BilibiliPlaylistHandler(BasePlatformHandler):
                 self._log("[*] 使用 Whisper 识别的文本作为回退方案...")
                 final_data = f"【视频标题】：{v_title} 。【视频链接】：{video_url} 。【详细内容】：{self._smart_truncate(raw_text, 3000)}"
             
+            # 检查是否应该停止
+            if self.should_stop:
+                self._log("[!] 任务已停止")
+                return
+            
             self._upload_to_dify(v_title, final_data)
+            
+            # 检查是否应该停止
+            if self.should_stop:
+                self._log("[!] 任务已停止")
+                return
             
             self._cleanup_video(video_id, v_file, f_dir)
             
@@ -199,147 +240,35 @@ URL：{url}
 内容：{self._smart_truncate(text_data, 2000)}
 """
             
-            # 获取模型配置
-            provider = self.config_manager.get_model_provider()
+            # 直接使用通义千问模型，不依赖配置
+            provider = "qwen"
             model_config = get_model_config(provider)
             
             self._log(f"[*] 使用模型供应商: {provider}")
             self._log(f"[*] 使用模型: {model_config['model_name']}")
             
-            # 根据供应商构建请求
-            if provider == "ollama":
-                # Ollama API
-                ollama_url = f"{model_config['base_url']}/generate"
-                payload = {
-                    "model": model_config['model_name'],
-                    "prompt": prompt,
-                    "stream": False
-                }
-                
-                headers = {}
-                if model_config['api_key']:
-                    headers["Authorization"] = f"Bearer {model_config['api_key']}"
-                
-                res = requests.post(ollama_url, json=payload, headers=headers, timeout=300)
-                if res.status_code == 200:
-                    response_json = res.json()
-                    ai_res = response_json.get("response", "").strip()
-                else:
-                    ai_res = ""
-                    
-            elif provider == "openai":
-                # OpenAI API
-                openai_url = f"{model_config['base_url']}/chat/completions"
-                payload = {
-                    "model": model_config['model_name'],
-                    "messages": [
-                        {"role": "user", "content": prompt}
-                    ],
-                    "temperature": 0.7
-                }
-                
-                headers = {
-                    "Content-Type": "application/json"
-                }
-                if model_config['api_key']:
-                    headers["Authorization"] = f"Bearer {model_config['api_key']}"
-                
-                res = requests.post(openai_url, json=payload, headers=headers, timeout=300)
-                if res.status_code == 200:
-                    response_json = res.json()
-                    ai_res = response_json.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
-                else:
-                    ai_res = ""
-                    
-            elif provider == "anthropic":
-                # Anthropic API
-                anthropic_url = f"{model_config['base_url']}/messages"
-                payload = {
-                    "model": model_config['model_name'],
-                    "messages": [
-                        {"role": "user", "content": prompt}
-                    ],
-                    "max_tokens": 2000
-                }
-                
-                headers = {
-                    "Content-Type": "application/json"
-                }
-                if model_config['api_key']:
-                    headers["x-api-key"] = model_config['api_key']
-                
-                res = requests.post(anthropic_url, json=payload, headers=headers, timeout=300)
-                if res.status_code == 200:
-                    response_json = res.json()
-                    ai_res = response_json.get("content", [{}])[0].get("text", "").strip()
-                else:
-                    ai_res = ""
-                    
-            elif provider == "qwen":
-                # 通义千问 API
-                qwen_url = f"{model_config['base_url']}/services/aigc/text-generation/generation"
-                payload = {
-                    "model": model_config['model_name'],
-                    "input": prompt,
-                    "parameters": {
-                        "temperature": 0.7,
-                        "max_tokens": 2000
-                    }
-                }
-                
-                headers = {
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {model_config['api_key']}"
-                }
-                
-                res = requests.post(qwen_url, json=payload, headers=headers, timeout=300)
-                if res.status_code == 200:
-                    response_json = res.json()
-                    ai_res = response_json.get("output", {}).get("text", "").strip()
-                else:
-                    ai_res = ""
-                    
-            elif provider == "deepseek":
-                # 深度求索 API
-                deepseek_url = f"{model_config['base_url']}/chat/completions"
-                payload = {
-                    "model": model_config['model_name'],
-                    "messages": [
-                        {"role": "user", "content": prompt}
-                    ],
+            # 通义千问 API
+            qwen_url = f"{model_config['base_url']}/services/aigc/text-generation/generation"
+            payload = {
+                "model": model_config['model_name'],
+                "input": prompt,
+                "parameters": {
                     "temperature": 0.7,
                     "max_tokens": 2000
                 }
-                
-                headers = {
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {model_config['api_key']}"
-                }
-                
-                res = requests.post(deepseek_url, json=payload, headers=headers, timeout=300)
-                if res.status_code == 200:
-                    response_json = res.json()
-                    ai_res = response_json.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
-                else:
-                    ai_res = ""
-                    
+            }
+            
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {model_config['api_key']}"
+            }
+            
+            res = requests.post(qwen_url, json=payload, headers=headers, timeout=300)
+            if res.status_code == 200:
+                response_json = res.json()
+                ai_res = response_json.get("output", {}).get("text", "").strip()
             else:
-                # 默认使用Ollama
-                ollama_url = self.config_manager.get_ollama_url()
-                ollama_model = self.config_manager.get_ollama_model()
-                
-                payload = {
-                    "model": ollama_model,
-                    "prompt": prompt,
-                    "stream": False
-                }
-                
-                res = requests.post(ollama_url, json=payload, timeout=300)
-                if res.status_code == 200:
-                    response_json = res.json()
-                    ai_res = response_json.get("response", "").strip()
-                else:
-                    ai_res = ""
+                ai_res = ""
             
             if not ai_res:
                 return ""
@@ -572,13 +501,31 @@ class KnowledgeUpdater(QObject):
             
             handler = self._get_handler(platform, update_type)
             if handler:
-                handler.should_stop = self.should_stop
-                handler.process(url, cookie)
+                # 启动处理器
+                thread = threading.Thread(target=self._process_with_handler, args=(handler, url, cookie))
+                thread.daemon = True
+                thread.start()
+                # 定期检查停止标志并更新处理器
+                while thread.is_alive():
+                    if self.should_stop:
+                        handler.should_stop = True
+                        self._log("[!] 正在停止更新任务...")
+                    import time
+                    time.sleep(0.1)
+                thread.join()
             
         except Exception as e:
             self._log(f"[-] 更新过程发生错误: {e}")
         finally:
             self._finish_update()
+    
+    def _process_with_handler(self, handler, url, cookie):
+        """使用处理器处理任务"""
+        try:
+            # 处理任务
+            handler.process(url, cookie)
+        except Exception as e:
+            self._log(f"[-] 处理器执行失败: {e}")
     
     def _finish_update(self):
         """完成更新任务"""
