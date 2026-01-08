@@ -315,11 +315,18 @@ ApplicationWindow {
                 viewTarget: "chat"
                 onClicked: {
                     console.log("=== New conversation button clicked ===")
+                    console.log("Current activeView:", window.activeView)
                     console.log("Has empty title conversation:", conversationManager.has_empty_title_conversation())
+                    console.log("Conversation model count:", conversationModel.count)
+                    
                     if (!conversationManager.has_empty_title_conversation()) {
                         console.log("Creating new conversation...")
-                        conversationManager.create_new_conversation()
+                        var newConvId = conversationManager.create_new_conversation()
+                        console.log("Created new conversation with ID:", newConvId)
+                        console.log("Setting activeView to 'chat'...")
                         window.activeView = "chat"
+                        console.log("Active view after setting:", window.activeView)
+                        console.log("Loading messages...")
                         loadMessages()
                     } else {
                         console.log("Switching to empty title conversation...")
@@ -333,6 +340,7 @@ ApplicationWindow {
                             }
                         }
                     }
+                    console.log("=== New conversation button click finished ===")
                 }
             }
 
