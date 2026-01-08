@@ -484,7 +484,8 @@ ApplicationWindow {
                                     id: messageText
                                     anchors.fill: parent
                                     anchors.margins: 10
-                                    text: content
+                                    text: role === "assistant" ? chatController.format_markdown(content) : content
+                                    textFormat: role === "assistant" ? Text.RichText : Text.PlainText
                                     color: "#e4e4e7"
                                     font.pixelSize: 15
                                     wrapMode: Text.WordWrap

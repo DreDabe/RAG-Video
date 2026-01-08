@@ -8,6 +8,7 @@ from PySide6.QtCore import QObject, Slot, Signal
 from PySide6.QtQuickControls2 import QQuickStyle
 from conversation_manager import ConversationManager
 from config_manager import ConfigManager
+from markdown_formatter import MarkdownFormatter
 
 
 class ChatController(QObject):
@@ -20,8 +21,13 @@ class ChatController(QObject):
     def __init__(self, conversation_manager=None):
         super().__init__()
         self.conversation_manager = conversation_manager or ConversationManager()
+        self.markdown_formatter = MarkdownFormatter()
         self.is_generating = False
         self.should_stop = False
+
+    @Slot(str, result=str)
+    def format_markdown(self, text):
+        return self.markdown_formatter.format(text)
 
     @Slot(str)
     def send_message(self, text):
@@ -93,6 +99,7 @@ if __name__ == "__main__":
     engine.rootContext().setContextProperty("chatController", controller)
     engine.rootContext().setContextProperty("conversationManager", controller.conversation_manager)
     engine.rootContext().setContextProperty("configManager", config_manager)
+    engine.rootContext().setContextProperty("markdownFormatter", controller.markdown_formatter)
 
     qml_file = Path(__file__).parent / "main.qml"
     engine.load(str(qml_file))
