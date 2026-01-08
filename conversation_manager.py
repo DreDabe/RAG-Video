@@ -136,6 +136,17 @@ class ConversationManager(QObject):
         self.conversationListChanged.emit()
         self.currentConversationChanged.emit()
 
+    @Slot(str, str)
+    def rename_conversation(self, conversation_id, new_title):
+        conversation = self.get_conversation(conversation_id)
+        if conversation:
+            conversation['title'] = new_title
+            conversation['updated_at'] = datetime.now().isoformat()
+            
+            self._sort_conversations()
+            self.save_conversations()
+            self.conversationListChanged.emit()
+
     def get_conversation(self, conversation_id):
         for conversation in self.conversations:
             if conversation['id'] == conversation_id:

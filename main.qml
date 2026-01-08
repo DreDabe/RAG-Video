@@ -339,13 +339,29 @@ ApplicationWindow {
                     id: listDel
                     width: sidebar.width - 24
                     height: 40
+                    hoverEnabled: true
+                    
+                    property bool isEditing: false
+                    
                     onClicked: {
-                        console.log("Clicked conversation:", model.id, model.title)
-                        conversationManager.load_conversation(model.id)
-                        loadMessages()
+                        if (!isEditing) {
+                            console.log("Clicked conversation:", model.id, model.title)
+                            conversationManager.load_conversation(model.id)
+                            loadMessages()
+                        }
                     }
+                    
+                    background: Rectangle {
+                        color: (listDel.hovered || String(model.id) === String(conversationManager.current_conversation_id)) ? "#1d1d20" : "transparent"
+                        radius: 8
+                    }
+                    
                     contentItem: RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 10
+                        anchors.rightMargin: 8
                         spacing: 0
+                        
                         Item {
                             Layout.preferredWidth: 40
                             Layout.fillHeight: true
@@ -354,20 +370,126 @@ ApplicationWindow {
                                 text: "•"
                                 color: (listDel.hovered || String(model.id) === String(conversationManager.current_conversation_id)) ? "white" : "#3f3f46"
                                 font.pixelSize: 20
+                                visible: sidebarExpanded
                             }
                         }
-                        Text {
-                            text: model.title
-                            color: (listDel.hovered || String(model.id) === String(conversationManager.current_conversation_id)) ? "white" : "#a1a1aa"
-                            font.pixelSize: 13
-                            elide: Text.ElideRight
+                        
+                        Item {
                             Layout.fillWidth: true
-                            opacity: sidebarExpanded ? 1.0 : 0.0
+                            Layout.fillHeight: true
+                            clip: true
+                            visible: sidebarExpanded
+                            
+                            Text {
+                                id: titleText
+                                anchors.fill: parent
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: model.title
+                                color: (listDel.hovered || String(model.id) === String(conversationManager.current_conversation_id)) ? "white" : "#a1a1aa"
+                                font.pixelSize: 13
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                                visible: !isEditing
+                            }
+                            
+                            TextField {
+                                id: editField
+                                anchors.fill: parent
+                                anchors.margins: 2
+                                text: model.title
+                                visible: isEditing
+                                color: "white"
+                                font.pixelSize: 13
+                                selectionColor: "#3b82f6"
+                                background: Rectangle {
+                                    color: "#09090b"
+                                    radius: 4
+                                    border.color: "#3b82f6"
+                                    border.width: 1
+                                }
+                                
+                                Component.onCompleted: {
+                                    if (visible) forceActiveFocus()
+                                }
+                                
+                                onAccepted: {
+                                    if (text.trim() !== "") {
+                                        conversationManager.rename_conversation(model.id, text.trim())
+                                    }
+                                    isEditing = false
+                                }
+                                
+                                Keys.onEscapePressed: {
+                                    text = model.title
+                                    isEditing = false
+                                }
+                            }
                         }
-                    }
-                    background: Rectangle {
-                        color: (listDel.hovered || String(model.id) === String(conversationManager.current_conversation_id)) ? "#1d1d20" : "transparent"
-                        radius: 8
+                        
+                        Button {
+                            id: moreBtn
+                            Layout.preferredWidth: 24
+                            Layout.fillHeight: true
+                            visible: sidebarExpanded && listDel.hovered && !isEditing
+                            opacity: 0.7
+                            
+                            background: null
+                            
+                            contentItem: Text {
+                                text: "..."
+                                color: (listDel.hovered || String(model.id) === String(conversationManager.current_conversation_id)) ? "white" : "#a1a1aa"
+                                font.pixelSize: 16
+                            }
+                            
+                            onClicked: actionMenu.open()
+                            
+                            Menu {
+                                id: actionMenu
+                                y: moreBtn.height
+                                x: -width + moreBtn.width
+                                
+                                background: Rectangle {
+                                    implicitWidth: 120
+                                    color: "#1e1e20"
+                                    border.color: "#2d2d30"
+                                    radius: 8
+                                }
+                                
+                                MenuItem {
+                                    text: "重命名"
+                                    contentItem: RowLayout {
+                                        spacing: 10
+                                        Image { source: "img/重命名.svg"; sourceSize: Qt.size(14, 14) }
+                                        Text { text: "重命名"; color: "white"; font.pixelSize: 12 }
+                                    }
+                                    onTriggered: {
+                                        isEditing = true
+                                        editField.forceActiveFocus()
+                                        editField.selectAll()
+                                    }
+                                    background: Rectangle {
+                                        color: parent.highlighted ? "#27272a" : "transparent"
+                                        radius: 4
+                                    }
+                                }
+                                
+                                MenuItem {
+                                    text: "删除"
+                                    contentItem: RowLayout {
+                                        spacing: 10
+                                        Image { source: "img/删除.svg"; sourceSize: Qt.size(14, 14) }
+                                        Text { text: "删除记录"; color: "#ef4444"; font.pixelSize: 12 }
+                                    }
+                                    onTriggered: {
+                                        deleteConfirmPopup.open()
+                                    }
+                                    background: Rectangle {
+                                        color: parent.highlighted ? "#27272a" : "transparent"
+                                        radius: 4
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -398,7 +520,90 @@ ApplicationWindow {
         }
     }
 
-    // ------------------ 主对话区 ------------------
+    // --- 删除确认弹窗 ---
+    Popup {
+        id: deleteConfirmPopup
+        anchors.centerIn: parent
+        width: 300
+        height: 150
+        modal: true
+        focus: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        
+        background: Rectangle {
+            color: "#18181b"
+            border.color: "#27272a"
+            radius: 12
+        }
+        
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 20
+            spacing: 15
+            
+            Text {
+                text: "确定要删除这段对话吗？"
+                color: "white"
+                font.pixelSize: 15
+                font.weight: Font.Medium
+                Layout.alignment: Qt.AlignHCenter
+            }
+            Text {
+                text: "此操作不可撤销。"
+                color: "#71717a"
+                font.pixelSize: 12
+                Layout.alignment: Qt.AlignHCenter
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: 10
+                spacing: 12
+                
+                Button {
+                    Layout.fillWidth: true
+                    text: "取消"
+                    onClicked: deleteConfirmPopup.close()
+                    
+                    background: Rectangle { 
+                        color: "#27272a"
+                        radius: 8
+                    }
+                    
+                    contentItem: Text {
+                        text: "取消"
+                        color: "white"
+                        font.pixelSize: 14
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+                
+                Button {
+                    Layout.fillWidth: true
+                    text: "删除"
+                    onClicked: {
+                        conversationManager.delete_conversation(conversationManager.current_conversation_id)
+                        deleteConfirmPopup.close()
+                    }
+                    
+                    background: Rectangle { 
+                        color: "#ef4444"
+                        radius: 8
+                    }
+                    
+                    contentItem: Text {
+                        text: "删除"
+                        color: "white"
+                        font.pixelSize: 14
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+            }
+        }
+    }
+
+    // --- 主对话区 ---
     Item {
         id: mainArea
         anchors.left: sidebar.right
