@@ -49,9 +49,10 @@ class ChatController(QObject):
         current_conv = self.conversation_manager.get_current_conversation()
         if not current_conv:
             print("[ChatController] 当前没有对话，创建新对话")
-            current_conv = self.conversation_manager.create_new_conversation()
-        
-        conversation_id = current_conv['id']
+            conversation_id = self.conversation_manager.create_new_conversation()
+            print(f"[ChatController] 新对话ID: {conversation_id}")
+        else:
+            conversation_id = current_conv['id']
         print(f"[ChatController] 对话ID: {conversation_id}")
         
         self.conversation_manager.add_message(conversation_id, "user", text)

@@ -61,7 +61,7 @@ class ConversationManager(QObject):
         except Exception as e:
             print(f"Error saving conversations: {e}")
 
-    @Slot()
+    @Slot(result=str)
     def create_new_conversation(self):
         conversation_id = str(uuid.uuid4())
         new_conversation = {
@@ -78,7 +78,7 @@ class ConversationManager(QObject):
         self.conversationListChanged.emit()
         self.currentConversationChanged.emit()
         
-        return new_conversation
+        return conversation_id
 
     @Slot(str, str, str)
     def add_message(self, conversation_id, role, content):
@@ -196,7 +196,6 @@ class ConversationManager(QObject):
                 'updated_at': c['updated_at']
             }
             for c in self.conversations
-            if c['title']
         ]
 
     @Slot(result=list)
