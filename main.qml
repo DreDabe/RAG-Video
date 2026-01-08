@@ -311,9 +311,12 @@ ApplicationWindow {
                 }
                 
                 function loadConversations() {
+                    console.log("Loading conversations...")
                     conversationModel.clear()
                     var list = conversationManager.get_conversation_list()
+                    console.log("Conversation list:", list.length, "items")
                     for (var i = 0; i < list.length; i++) {
+                        console.log("Adding conversation:", list[i].title)
                         conversationModel.append(list[i])
                     }
                 }
@@ -322,6 +325,11 @@ ApplicationWindow {
                     id: listDel
                     width: sidebar.width - 24
                     height: 40
+                    onClicked: {
+                        console.log("Clicked conversation:", model.id, model.title)
+                        conversationManager.load_conversation(model.id)
+                        loadMessages()
+                    }
                     contentItem: RowLayout {
                         spacing: 0
                         Item {
@@ -330,13 +338,13 @@ ApplicationWindow {
                             Text {
                                 anchors.centerIn: parent
                                 text: "•"
-                                color: (listDel.hovered || model.id === conversationManager.current_conversation_id) ? "white" : "#3f3f46"
+                                color: (listDel.hovered || String(model.id) === String(conversationManager.current_conversation_id)) ? "white" : "#3f3f46"
                                 font.pixelSize: 20
                             }
                         }
                         Text {
                             text: model.title
-                            color: (listDel.hovered || model.id === conversationManager.current_conversation_id) ? "white" : "#a1a1aa"
+                            color: (listDel.hovered || String(model.id) === String(conversationManager.current_conversation_id)) ? "white" : "#a1a1aa"
                             font.pixelSize: 13
                             elide: Text.ElideRight
                             Layout.fillWidth: true
@@ -344,12 +352,8 @@ ApplicationWindow {
                         }
                     }
                     background: Rectangle {
-                        color: (listDel.hovered || model.id === conversationManager.current_conversation_id) ? "#1d1d20" : "transparent"
+                        color: (listDel.hovered || String(model.id) === String(conversationManager.current_conversation_id)) ? "#1d1d20" : "transparent"
                         radius: 8
-                    }
-                    onClicked: {
-                        conversationManager.load_conversation(model.id)
-                        loadMessages()
                     }
                 }
             }
@@ -419,12 +423,18 @@ ApplicationWindow {
                 function onMessageAdded() {
                     loadMessages()
                 }
+                function onMessageReceived(msg) {
+                    console.log("Message received:", msg)
+                }
             }
             
             function loadMessages() {
+                console.log("Loading messages for conversation:", conversationManager.current_conversation_id)
                 messageModel.clear()
                 var messages = conversationManager.get_current_messages()
+                console.log("Messages count:", messages.length)
                 for (var i = 0; i < messages.length; i++) {
+                    console.log("Adding message:", messages[i].role, messages[i].content.substring(0, 20))
                     messageModel.append(messages[i])
                 }
                 chatList.positionViewAtEnd()
