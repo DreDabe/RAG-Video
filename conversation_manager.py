@@ -171,3 +171,10 @@ class ConversationManager(QObject):
         if conversation:
             return conversation['messages']
         return []
+    
+    @Slot(result=bool)
+    def has_messages(self):
+        conversation = self.get_current_conversation()
+        if conversation and len(conversation['messages']) > 0:
+            return True
+        return False

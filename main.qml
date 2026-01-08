@@ -308,9 +308,11 @@ ApplicationWindow {
                 isAccent: true
                 viewTarget: "chat"
                 onClicked: {
-                    conversationManager.create_new_conversation()
-                    window.activeView = "chat"
-                    loadMessages()
+                    if (!conversationManager.has_messages()) {
+                        conversationManager.create_new_conversation()
+                        window.activeView = "chat"
+                        loadMessages()
+                    }
                 }
             }
 
@@ -545,6 +547,20 @@ ApplicationWindow {
                             wrapMode: Text.WordWrap
                             selectByMouse: true
                             verticalAlignment: Text.AlignVCenter
+                            
+                            Keys.onPressed: function(event) {
+                                if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                                    if (event.modifiers & Qt.ShiftModifier) {
+                                        inputField.insert(inputField.cursorPosition, "\n")
+                                    } else {
+                                        if (inputField.text.trim() !== "" && !chatView.isGenerating) {
+                                            chatController.send_message(inputField.text)
+                                            inputField.clear()
+                                        }
+                                    }
+                                    event.accepted = true
+                                }
+                            }
                         }
                     }
 
@@ -564,7 +580,6 @@ ApplicationWindow {
                                 source: chatView.isGenerating ? "img/停止.svg" : (inputField.text.length > 0 ? "img/发送.svg" : "img/发送-Empty.svg")
                                 sourceSize: Qt.size(16, 16)
                                 opacity: 1.0
-                                visible: !chatView.isGenerating
                             }
                             
                             BusyIndicator {
