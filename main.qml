@@ -395,7 +395,6 @@ ApplicationWindow {
                             TextField {
                                 id: editField
                                 anchors.fill: parent
-                                anchors.margins: 2
                                 text: model.title
                                 visible: isEditing
                                 color: "white"
@@ -441,7 +440,10 @@ ApplicationWindow {
                                 font.pixelSize: 16
                             }
                             
-                            onClicked: actionMenu.open()
+                            onClicked: {
+                                conversationToDelete = model.id
+                                actionMenu.open()
+                            }
                             
                             Menu {
                                 id: actionMenu
@@ -530,6 +532,8 @@ ApplicationWindow {
         focus: true
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
         
+        property string conversationToDelete: ""
+        
         background: Rectangle {
             color: "#18181b"
             border.color: "#27272a"
@@ -582,7 +586,7 @@ ApplicationWindow {
                     Layout.fillWidth: true
                     text: "删除"
                     onClicked: {
-                        conversationManager.delete_conversation(conversationManager.current_conversation_id)
+                        conversationManager.delete_conversation(conversationToDelete)
                         deleteConfirmPopup.close()
                     }
                     
