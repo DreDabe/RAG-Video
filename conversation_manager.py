@@ -123,11 +123,17 @@ class ConversationManager(QObject):
 
     @Slot(str)
     def delete_conversation(self, conversation_id):
+        print(f"Deleting conversation: {conversation_id}")
+        print(f"Current conversations before delete: {len(self.conversations)}")
+        
         self.conversations = [c for c in self.conversations if c['id'] != conversation_id]
+        
+        print(f"Current conversations after delete: {len(self.conversations)}")
         
         if self._current_conversation_id == conversation_id:
             if self.conversations:
                 self._current_conversation_id = self.conversations[0]['id']
+                print(f"New current conversation ID: {self._current_conversation_id}")
             else:
                 self._current_conversation_id = None
                 self.create_new_conversation()

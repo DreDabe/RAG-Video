@@ -18,6 +18,7 @@ ApplicationWindow {
     property bool windowMaximized: false
     property bool settingsVisible: false
     property string activeView: "chat"
+    property string conversationToDelete: ""
 
     function loadConversations() {
         console.log("Loading conversations...")
@@ -363,7 +364,7 @@ ApplicationWindow {
                         spacing: 0
                         
                         Item {
-                            Layout.preferredWidth: 40
+                            Layout.preferredWidth: 28
                             Layout.fillHeight: true
                             Text {
                                 anchors.centerIn: parent
@@ -383,12 +384,11 @@ ApplicationWindow {
                             Text {
                                 id: titleText
                                 anchors.fill: parent
-                                anchors.verticalCenter: parent.verticalCenter
                                 text: model.title
                                 color: (listDel.hovered || String(model.id) === String(conversationManager.current_conversation_id)) ? "white" : "#a1a1aa"
                                 font.pixelSize: 13
                                 elide: Text.ElideRight
-                                Layout.fillWidth: true
+                                verticalAlignment: Text.AlignVCenter
                                 visible: !isEditing
                             }
                             
@@ -399,6 +399,7 @@ ApplicationWindow {
                                 visible: isEditing
                                 color: "white"
                                 font.pixelSize: 13
+                                verticalAlignment: Text.AlignVCenter
                                 selectionColor: "#3b82f6"
                                 background: Rectangle {
                                     color: "#09090b"
@@ -427,21 +428,32 @@ ApplicationWindow {
                         
                         Button {
                             id: moreBtn
-                            Layout.preferredWidth: 24
+                            Layout.preferredWidth: 28
                             Layout.fillHeight: true
+                            Layout.alignment: Qt.AlignVCenter
                             visible: sidebarExpanded && listDel.hovered && !isEditing
-                            opacity: 0.7
+                            z: 2
                             
-                            background: null
+                            background: Rectangle {
+                                implicitWidth: 28
+                                implicitHeight: 28
+                                radius: 14
+                                color: parent.hovered ? "#2a2a2d" : "transparent"
+                                Behavior on color { ColorAnimation { duration: 150 } }
+                            }
                             
                             contentItem: Text {
-                                text: "..."
-                                color: (listDel.hovered || String(model.id) === String(conversationManager.current_conversation_id)) ? "white" : "#a1a1aa"
-                                font.pixelSize: 16
+                                text: "•••"
+                                color: "white"
+                                font.pixelSize: 12
+                                font.bold: true
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
                             }
                             
                             onClicked: {
-                                conversationToDelete = model.id
+                                console.log("More button clicked, conversation id:", model.id)
+                                window.conversationToDelete = model.id
                                 actionMenu.open()
                             }
                             
@@ -449,6 +461,15 @@ ApplicationWindow {
                                 id: actionMenu
                                 y: moreBtn.height
                                 x: -width + moreBtn.width
+                                modal: true
+                                z: 1000
+                                
+                                onOpened: {
+                                    console.log("Menu opened")
+                                }
+                                onClosed: {
+                                    console.log("Menu closed")
+                                }
                                 
                                 background: Rectangle {
                                     implicitWidth: 120
@@ -483,7 +504,7 @@ ApplicationWindow {
                                         Text { text: "删除记录"; color: "#ef4444"; font.pixelSize: 12 }
                                     }
                                     onTriggered: {
-                                        deleteConfirmPopup.open()
+                                        deleteConfirmPopup.openDeleteConfirm(window.conversationToDelete)
                                     }
                                     background: Rectangle {
                                         color: parent.highlighted ? "#27272a" : "transparent"
@@ -531,8 +552,6 @@ ApplicationWindow {
         modal: true
         focus: true
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-        
-        property string conversationToDelete: ""
         
         background: Rectangle {
             color: "#18181b"
@@ -586,8 +605,10 @@ ApplicationWindow {
                     Layout.fillWidth: true
                     text: "删除"
                     onClicked: {
-                        conversationManager.delete_conversation(conversationToDelete)
-                        deleteConfirmPopup.close()
+                        if (deleteConfirmPopup.conversationToDelete !== "") {
+                            conversationManager.delete_conversation(deleteConfirmPopup.conversationToDelete)
+                            deleteConfirmPopup.close()
+                        }
                     }
                     
                     background: Rectangle { 
@@ -604,6 +625,11 @@ ApplicationWindow {
                     }
                 }
             }
+        }
+        
+        function openDeleteConfirm(conversationId) {
+            conversationToDelete = conversationId
+            open()
         }
     }
 
