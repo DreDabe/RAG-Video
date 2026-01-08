@@ -45,9 +45,6 @@ class ChatController(QObject):
         self.conversation_manager.add_message(conversation_id, "user", text)
         self.messageAdded.emit()
         
-        if current_conv['title'] == '新对话':
-            self.conversation_manager.update_title(conversation_id, text)
-        
         self.is_generating = True
         self.should_stop = False
         self.generationStarted.emit()

@@ -19,6 +19,29 @@ ApplicationWindow {
     property bool settingsVisible: false
     property string activeView: "chat"
 
+    function loadConversations() {
+        console.log("Loading conversations...")
+        conversationModel.clear()
+        var list = conversationManager.get_conversation_list()
+        console.log("Conversation list:", list.length, "items")
+        for (var i = 0; i < list.length; i++) {
+            console.log("Adding conversation:", list[i].title)
+            conversationModel.append(list[i])
+        }
+    }
+
+    function loadMessages() {
+        console.log("Loading messages for conversation:", conversationManager.current_conversation_id)
+        messageModel.clear()
+        var messages = conversationManager.get_current_messages()
+        console.log("Messages count:", messages.length)
+        for (var i = 0; i < messages.length; i++) {
+            console.log("Adding message:", messages[i].role, messages[i].content.substring(0, 20))
+            messageModel.append(messages[i])
+        }
+        chatList.positionViewAtEnd()
+    }
+
     // 动画配置
     Behavior on sidebarWidth {
         NumberAnimation { duration: 350; easing.type: Easing.InOutQuart }
@@ -310,17 +333,6 @@ ApplicationWindow {
                     }
                 }
                 
-                function loadConversations() {
-                    console.log("Loading conversations...")
-                    conversationModel.clear()
-                    var list = conversationManager.get_conversation_list()
-                    console.log("Conversation list:", list.length, "items")
-                    for (var i = 0; i < list.length; i++) {
-                        console.log("Adding conversation:", list[i].title)
-                        conversationModel.append(list[i])
-                    }
-                }
-                
                 delegate: ItemDelegate {
                     id: listDel
                     width: sidebar.width - 24
@@ -391,6 +403,8 @@ ApplicationWindow {
         anchors.right: parent.right
         anchors.top: titleBar.bottom
         anchors.bottom: parent.bottom
+        
+        ListModel { id: messageModel }
 
         // ================== 视图 1: 聊天界面 ==================
         Item {
@@ -427,18 +441,6 @@ ApplicationWindow {
                     console.log("Message received:", msg)
                 }
             }
-            
-            function loadMessages() {
-                console.log("Loading messages for conversation:", conversationManager.current_conversation_id)
-                messageModel.clear()
-                var messages = conversationManager.get_current_messages()
-                console.log("Messages count:", messages.length)
-                for (var i = 0; i < messages.length; i++) {
-                    console.log("Adding message:", messages[i].role, messages[i].content.substring(0, 20))
-                    messageModel.append(messages[i])
-                }
-                chatList.positionViewAtEnd()
-            }
 
             ListView {
                 id: chatList
@@ -446,7 +448,7 @@ ApplicationWindow {
                 anchors.margins: 50
                 anchors.bottomMargin: 140
                 spacing: 32
-                model: ListModel { id: messageModel }
+                model: messageModel
                 clip: true
 
                 delegate: Item {

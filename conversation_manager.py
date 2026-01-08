@@ -2,7 +2,7 @@ import json
 import uuid
 from datetime import datetime
 from pathlib import Path
-from PySide6.QtCore import QObject, Signal, Slot
+from PySide6.QtCore import QObject, Signal, Slot, Property
 
 
 class ConversationManager(QObject):
@@ -16,9 +16,19 @@ class ConversationManager(QObject):
         
         self.conversations_file = self.data_dir / "conversations.json"
         self.conversations = []
-        self.current_conversation_id = None
+        self._current_conversation_id = None
         
         self.load_conversations()
+    
+    @Property(str, notify=currentConversationChanged)
+    def current_conversation_id(self):
+        return self._current_conversation_id
+    
+    @current_conversation_id.setter
+    def current_conversation_id(self, value):
+        if self._current_conversation_id != value:
+            self._current_conversation_id = value
+            self.currentConversationChanged.emit()
 
     def load_conversations(self):
         if self.conversations_file.exists():
@@ -26,14 +36,17 @@ class ConversationManager(QObject):
                 with open(self.conversations_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     self.conversations = data.get('conversations', [])
-                    self.current_conversation_id = data.get('current_conversation_id')
+                    self._current_conversation_id = None
             except Exception as e:
                 print(f"Error loading conversations: {e}")
                 self.conversations = []
-                self.current_conversation_id = None
+                self._current_conversation_id = None
         else:
             self.conversations = []
-            self.current_conversation_id = None
+            self._current_conversation_id = None
+        
+        if not self.conversations:
+            self.create_new_conversation()
         
         self.conversationListChanged.emit()
 
@@ -53,14 +66,14 @@ class ConversationManager(QObject):
         conversation_id = str(uuid.uuid4())
         new_conversation = {
             'id': conversation_id,
-            'title': '新对话',
+            'title': '',
             'messages': [],
             'created_at': datetime.now().isoformat(),
             'updated_at': datetime.now().isoformat()
         }
         
         self.conversations.insert(0, new_conversation)
-        self.current_conversation_id = conversation_id
+        self._current_conversation_id = conversation_id
         self.save_conversations()
         self.conversationListChanged.emit()
         self.currentConversationChanged.emit()
@@ -77,6 +90,10 @@ class ConversationManager(QObject):
                 'timestamp': datetime.now().isoformat()
             }
             conversation['messages'].append(message)
+            
+            if not conversation['title'] and role == 'user':
+                conversation['title'] = content
+            
             conversation['updated_at'] = datetime.now().isoformat()
             
             self._sort_conversations()
@@ -98,12 +115,7 @@ class ConversationManager(QObject):
     def load_conversation(self, conversation_id):
         conversation = self.get_conversation(conversation_id)
         if conversation:
-            self.current_conversation_id = conversation_id
-            conversation['updated_at'] = datetime.now().isoformat()
-            
-            self._sort_conversations()
-            self.save_conversations()
-            self.conversationListChanged.emit()
+            self._current_conversation_id = conversation_id
             self.currentConversationChanged.emit()
             
             return conversation
@@ -113,11 +125,11 @@ class ConversationManager(QObject):
     def delete_conversation(self, conversation_id):
         self.conversations = [c for c in self.conversations if c['id'] != conversation_id]
         
-        if self.current_conversation_id == conversation_id:
+        if self._current_conversation_id == conversation_id:
             if self.conversations:
-                self.current_conversation_id = self.conversations[0]['id']
+                self._current_conversation_id = self.conversations[0]['id']
             else:
-                self.current_conversation_id = None
+                self._current_conversation_id = None
                 self.create_new_conversation()
         
         self.save_conversations()
@@ -150,6 +162,7 @@ class ConversationManager(QObject):
                 'updated_at': c['updated_at']
             }
             for c in self.conversations
+            if c['title']
         ]
 
     @Slot(result=list)
