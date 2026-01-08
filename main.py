@@ -7,6 +7,7 @@ from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtCore import QObject, Slot, Signal
 from PySide6.QtQuickControls2 import QQuickStyle
 from conversation_manager import ConversationManager
+from config_manager import ConfigManager
 
 
 class ChatController(QObject):
@@ -87,9 +88,11 @@ if __name__ == "__main__":
     app = QGuiApplication(sys.argv)
     engine = QQmlApplicationEngine()
 
+    config_manager = ConfigManager()
     controller = ChatController()
     engine.rootContext().setContextProperty("chatController", controller)
     engine.rootContext().setContextProperty("conversationManager", controller.conversation_manager)
+    engine.rootContext().setContextProperty("configManager", config_manager)
 
     qml_file = Path(__file__).parent / "main.qml"
     engine.load(str(qml_file))

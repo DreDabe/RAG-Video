@@ -590,6 +590,29 @@ ApplicationWindow {
             anchors.fill: parent
             visible: activeView === "settings"
             
+            Component.onCompleted: {
+                Qt.callLater(function() {
+                    datasetApiField.fieldText = configManager.get_dataset_api()
+                    datasetIdField.fieldText = configManager.get_dataset_id()
+                    appUrlField.fieldText = configManager.get_app_url()
+                    appApiField.fieldText = configManager.get_app_api()
+                    languageCombo.currentIndex = languageCombo.find(configManager.get_language())
+                })
+            }
+            
+            Connections {
+                target: configManager
+                function onConfigChanged() {
+                    Qt.callLater(function() {
+                        datasetApiField.fieldText = configManager.get_dataset_api()
+                        datasetIdField.fieldText = configManager.get_dataset_id()
+                        appUrlField.fieldText = configManager.get_app_url()
+                        appApiField.fieldText = configManager.get_app_api()
+                        languageCombo.currentIndex = languageCombo.find(configManager.get_language())
+                    })
+                }
+            }
+            
             ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: 40
@@ -608,18 +631,30 @@ ApplicationWindow {
                         
                         component SettingInput : ColumnLayout {
                             property string label: ""
-                            property string defaultValue: ""
+                            property string configKey: ""
+                            property string configType: "dify"
+                            property alias fieldText: settingField.text
                             Layout.fillWidth: true
                             spacing: 8
                             Text { text: label; color: "#a1a1aa"; font.pixelSize: 12 }
                             TextField {
+                                id: settingField
                                 Layout.fillWidth: true
-                                text: defaultValue
                                 color: "white"
                                 font.pixelSize: 13
                                 verticalAlignment: Text.AlignVCenter
                                 leftPadding: 12
                                 rightPadding: 12
+                                onTextChanged: {
+                                    if (configType === "dify") {
+                                        if (configKey === "dataset_api") configManager.set_dataset_api(text)
+                                        if (configKey === "dataset_id") configManager.set_dataset_id(text)
+                                        if (configKey === "app_url") configManager.set_app_url(text)
+                                        if (configKey === "app_api") configManager.set_app_api(text)
+                                    } else if (configType === "general") {
+                                        if (configKey === "language") configManager.set_language(text)
+                                    }
+                                }
                                 background: Rectangle {
                                     color: "#09090b"
                                     radius: 8
@@ -629,10 +664,30 @@ ApplicationWindow {
                             }
                         }
 
-                        SettingInput { label: "知识库 API (Dataset)"; defaultValue: "dataset-nCFE6gRoqoLnb5Vdn3O3vPc0" }
-                        SettingInput { label: "知识库 ID"; defaultValue: "440bcad8-f7b1-4804-bae3-2ff47e268fee" }
-                        SettingInput { label: "Dify 应用 URL"; defaultValue: "http://localhost/v1/chat-messages" }
-                        SettingInput { label: "Dify 应用 API (App Key)"; defaultValue: "app-V2QqKcBG5msVqGCxPIgm2fR3" }
+                        SettingInput { 
+                            label: "知识库 API (Dataset)"; 
+                            configKey: "dataset_api"
+                            configType: "dify"
+                            id: datasetApiField
+                        }
+                        SettingInput { 
+                            label: "知识库 ID"; 
+                            configKey: "dataset_id"
+                            configType: "dify"
+                            id: datasetIdField
+                        }
+                        SettingInput { 
+                            label: "Dify 应用 URL"; 
+                            configKey: "app_url"
+                            configType: "dify"
+                            id: appUrlField
+                        }
+                        SettingInput { 
+                            label: "Dify 应用 API (App Key)"; 
+                            configKey: "app_api"
+                            configType: "dify"
+                            id: appApiField
+                        }
 
                         Text { text: "通用"; color: "#3b82f6"; font.pixelSize: 14; Layout.topMargin: 20 }
                         RowLayout {
@@ -641,6 +696,9 @@ ApplicationWindow {
                                 id: languageCombo
                                 model: ["简体中文", "English"]
                                 Layout.preferredWidth: 150
+                                onActivated: {
+                                    configManager.set_language(currentText)
+                                }
                                 delegate: ItemDelegate {
                                     width: languageCombo.width
                                     contentItem: Text { text: modelData; color: "white"; verticalAlignment: Text.AlignVCenter }
