@@ -6,6 +6,7 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtCore import QObject, Slot, Signal
 from PySide6.QtQuickControls2 import QQuickStyle
+from conversation_manager import ConversationManager
 
 
 class ChatController(QObject):
@@ -13,9 +14,11 @@ class ChatController(QObject):
     generationStarted = Signal()
     generationStopped = Signal()
     loadingStateChanged = Signal(bool)
+    messageAdded = Signal()
 
-    def __init__(self):
+    def __init__(self, conversation_manager=None):
         super().__init__()
+        self.conversation_manager = conversation_manager or ConversationManager()
         self.is_generating = False
         self.should_stop = False
 
@@ -25,6 +28,18 @@ class ChatController(QObject):
         
         if self.is_generating:
             return
+        
+        current_conv = self.conversation_manager.get_current_conversation()
+        if not current_conv:
+            current_conv = self.conversation_manager.create_new_conversation()
+        
+        conversation_id = current_conv['id']
+        
+        self.conversation_manager.add_message(conversation_id, "user", text)
+        self.messageAdded.emit()
+        
+        if current_conv['title'] == '新对话':
+            self.conversation_manager.update_title(conversation_id, text)
         
         self.is_generating = True
         self.should_stop = False
@@ -44,6 +59,9 @@ class ChatController(QObject):
                 
                 if self.should_stop:
                     return
+                
+                self.conversation_manager.add_message(conversation_id, "assistant", "1")
+                self.messageAdded.emit()
                 
                 self.is_generating = False
                 self.generationStopped.emit()
@@ -71,6 +89,7 @@ if __name__ == "__main__":
 
     controller = ChatController()
     engine.rootContext().setContextProperty("chatController", controller)
+    engine.rootContext().setContextProperty("conversationManager", controller.conversation_manager)
 
     qml_file = Path(__file__).parent / "main.qml"
     engine.load(str(qml_file))

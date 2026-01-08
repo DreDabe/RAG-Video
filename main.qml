@@ -285,16 +285,39 @@ ApplicationWindow {
                 isAccent: true
                 viewTarget: "chat"
                 onClicked: {
+                    conversationManager.create_new_conversation()
                     window.activeView = "chat"
+                    loadMessages()
                 }
             }
 
             // 3. 对话列表
             ListView {
+                id: conversationList
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 clip: true
-                model: ["如何使用Dify", "数字花园简介", "检索测试"]
+                model: ListModel { id: conversationModel }
+                
+                Component.onCompleted: {
+                    loadConversations()
+                }
+                
+                Connections {
+                    target: conversationManager
+                    function onConversationListChanged() {
+                        loadConversations()
+                    }
+                }
+                
+                function loadConversations() {
+                    conversationModel.clear()
+                    var list = conversationManager.get_conversation_list()
+                    for (var i = 0; i < list.length; i++) {
+                        conversationModel.append(list[i])
+                    }
+                }
+                
                 delegate: ItemDelegate {
                     id: listDel
                     width: sidebar.width - 24
@@ -307,20 +330,26 @@ ApplicationWindow {
                             Text {
                                 anchors.centerIn: parent
                                 text: "•"
-                                color: listDel.hovered ? "white" : "#3f3f46"
+                                color: (listDel.hovered || model.id === conversationManager.current_conversation_id) ? "white" : "#3f3f46"
                                 font.pixelSize: 20
                             }
                         }
                         Text {
-                            text: modelData; color: listDel.hovered ? "white" : "#a1a1aa"
-                            font.pixelSize: 13; elide: Text.ElideRight
+                            text: model.title
+                            color: (listDel.hovered || model.id === conversationManager.current_conversation_id) ? "white" : "#a1a1aa"
+                            font.pixelSize: 13
+                            elide: Text.ElideRight
                             Layout.fillWidth: true
                             opacity: sidebarExpanded ? 1.0 : 0.0
                         }
                     }
                     background: Rectangle {
-                        color: listDel.hovered ? "#1d1d20" : "transparent"
+                        color: (listDel.hovered || model.id === conversationManager.current_conversation_id) ? "#1d1d20" : "transparent"
                         radius: 8
+                    }
+                    onClicked: {
+                        conversationManager.load_conversation(model.id)
+                        loadMessages()
                     }
                 }
             }
@@ -376,6 +405,29 @@ ApplicationWindow {
                 function onGenerationStopped() {
                     chatView.isGenerating = false
                 }
+            }
+            
+            Connections {
+                target: conversationManager
+                function onCurrentConversationChanged() {
+                    loadMessages()
+                }
+            }
+            
+            Connections {
+                target: chatController
+                function onMessageAdded() {
+                    loadMessages()
+                }
+            }
+            
+            function loadMessages() {
+                messageModel.clear()
+                var messages = conversationManager.get_current_messages()
+                for (var i = 0; i < messages.length; i++) {
+                    messageModel.append(messages[i])
+                }
+                chatList.positionViewAtEnd()
             }
 
             ListView {
@@ -522,12 +574,6 @@ ApplicationWindow {
                             if (chatView.isGenerating) {
                                 chatController.stop_generation()
                             } else if (inputField.text.trim() !== "") {
-                                messageModel.append({"role": "user", "content": inputField.text})
-                                
-                                if (chatView.currentTitle === "") {
-                                    chatView.currentTitle = inputField.text
-                                }
-                                
                                 chatController.send_message(inputField.text)
                                 inputField.clear()
                                 chatList.positionViewAtEnd()
@@ -767,15 +813,6 @@ ApplicationWindow {
                     }
                 }
             }
-        }
-    }
-
-    // 后端连接
-    Connections {
-        target: chatController
-        function onMessageReceived(msg) {
-            messageModel.append({"role": "assistant", "content": msg})
-            chatList.positionViewAtEnd()
         }
     }
 }
