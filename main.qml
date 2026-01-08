@@ -32,11 +32,16 @@ ApplicationWindow {
     }
 
     function loadMessages() {
+        console.log("=== loadMessages called ===")
+        console.log("Current activeView:", window.activeView)
+        console.log("Current conversation ID:", conversationManager.current_conversation_id)
+        
         var currentId = conversationManager.current_conversation_id
         if (!currentId) {
             console.log("No current conversation, skipping message load")
             return
         }
+        
         console.log("Loading messages for conversation:", currentId)
         messageModel.clear()
         var messages = conversationManager.get_current_messages()
@@ -46,6 +51,7 @@ ApplicationWindow {
             messageModel.append(messages[i])
         }
         chatList.positionViewAtEnd()
+        console.log("=== loadMessages finished ===")
     }
 
     // 动画配置
@@ -374,8 +380,10 @@ ApplicationWindow {
                     onClicked: {
                         if (!isEditing) {
                             console.log("Clicked conversation:", model.id, model.title)
+                            console.log("Setting activeView to 'chat'...")
+                            window.activeView = "chat"
+                            console.log("Active view after setting:", window.activeView)
                             conversationManager.load_conversation(model.id)
-                            loadMessages()
                         }
                     }
                     
@@ -955,7 +963,14 @@ ApplicationWindow {
                     languageCombo.currentIndex = languageCombo.find(configManager.get_language())
                     
                     // 初始化模型配置
-                    modelProviderCombo.currentIndex = modelProviderCombo.find(configManager.get_model_provider())
+                    var provider = configManager.get_model_provider()
+                    console.log("Loading model provider:", provider)
+                    for (var i = 0; i < modelProviderCombo.count; i++) {
+                        if (modelProviderCombo.textAt(i) === provider) {
+                            modelProviderCombo.currentIndex = i
+                            break
+                        }
+                    }
                     ollamaBaseUrlField.fieldText = configManager.get_ollama_base_url()
                     ollamaModelNameField.fieldText = configManager.get_ollama_model_name()
                     ollamaApiKeyField.fieldText = configManager.get_ollama_api_key()
@@ -986,9 +1001,13 @@ ApplicationWindow {
                         
                         // 更新模型配置
                         Qt.callLater(function() {
-                            var providerIndex = modelProviderCombo.find(configManager.get_model_provider())
-                            if (providerIndex >= 0) {
-                                modelProviderCombo.currentIndex = providerIndex
+                            var provider = configManager.get_model_provider()
+                            console.log("Config changed, updating model provider:", provider)
+                            for (var i = 0; i < modelProviderCombo.count; i++) {
+                                if (modelProviderCombo.textAt(i) === provider) {
+                                    modelProviderCombo.currentIndex = i
+                                    break
+                                }
                             }
                             ollamaBaseUrlField.fieldText = configManager.get_ollama_base_url()
                             ollamaModelNameField.fieldText = configManager.get_ollama_model_name()

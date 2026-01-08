@@ -36,16 +36,36 @@ class ConversationManager(QObject):
                 with open(self.conversations_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     self.conversations = data.get('conversations', [])
-                    self._current_conversation_id = None
+                    # 清理空对话，只保留一个空对话
+                    empty_conversations = [c for c in self.conversations if not c.get('title') or c['title'].strip() == '']
+                    if len(empty_conversations) > 1:
+                        # 保留最新的空对话，删除其他空对话
+                        latest_empty = empty_conversations[0]
+                        self.conversations = [c for c in self.conversations if c.get('title') and c['title'].strip() != ''] + [latest_empty]
+                    
+                    # 如果没有对话，创建一个新对话
+                    if not self.conversations:
+                        self.create_new_conversation()
+                    
+                    # 设置当前对话ID
+                    saved_current_id = data.get('current_conversation_id')
+                    if saved_current_id:
+                        # 检查保存的对话ID是否仍然存在
+                        if any(c['id'] == saved_current_id for c in self.conversations):
+                            self._current_conversation_id = saved_current_id
+                        else:
+                            # 如果保存的对话不存在，使用第一个对话
+                            self._current_conversation_id = self.conversations[0]['id'] if self.conversations else None
+                    else:
+                        self._current_conversation_id = self.conversations[0]['id'] if self.conversations else None
             except Exception as e:
                 print(f"Error loading conversations: {e}")
                 self.conversations = []
                 self._current_conversation_id = None
+                self.create_new_conversation()
         else:
             self.conversations = []
             self._current_conversation_id = None
-        
-        if not self.conversations:
             self.create_new_conversation()
         
         self.conversationListChanged.emit()
