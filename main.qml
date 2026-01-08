@@ -685,6 +685,7 @@ ApplicationWindow {
 
             property bool isGenerating: false
             property string currentTitle: ""
+            property string streamingResponse: ""
 
             Connections {
                 target: chatController
@@ -712,6 +713,24 @@ ApplicationWindow {
                 }
                 function onMessageReceived(msg) {
                     console.log("Message received:", msg)
+                    chatView.streamingResponse = ""
+                }
+                function onMessageChunkReceived(chunk) {
+                    console.log("Message chunk received:", chunk)
+                    chatView.streamingResponse += chunk
+                }
+                function onGenerationStopped() {
+                    console.log("=== Generation stopped ===")
+                    chatView.isGenerating = false
+                    if (chatView.streamingResponse !== "") {
+                        console.log("Adding stopped message:", chatView.streamingResponse)
+                        var currentId = conversationManager.current_conversation_id
+                        if (currentId) {
+                            conversationManager.add_message(currentId, "assistant", chatView.streamingResponse + "\n\n*已手动终止输出*")
+                            loadMessages()
+                        }
+                        chatView.streamingResponse = ""
+                    }
                 }
             }
 
@@ -719,7 +738,7 @@ ApplicationWindow {
                 id: chatList
                 anchors.fill: parent
                 anchors.margins: 50
-                anchors.bottomMargin: 140
+                anchors.bottomMargin: chatView.isGenerating && chatView.streamingResponse !== "" ? 240 : 140
                 spacing: 32
                 model: messageModel
                 clip: true
@@ -779,6 +798,36 @@ ApplicationWindow {
                                 }
                             }
                         }
+                    }
+                }
+            }
+
+            Rectangle {
+                id: streamingResponseContainer
+                width: Math.min(parent.width - 120, 800)
+                anchors.bottom: inputContainer.top
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottomMargin: 20
+                color: "transparent"
+                visible: chatView.isGenerating && chatView.streamingResponse !== ""
+                height: streamingResponseText.implicitHeight + 20
+
+                Rectangle {
+                    anchors.fill: parent
+                    color: "#27272a"
+                    radius: 12
+
+                    Text {
+                        id: streamingResponseText
+                        anchors.fill: parent
+                        anchors.margins: 10
+                        text: chatController.format_markdown(chatView.streamingResponse)
+                        textFormat: Text.RichText
+                        color: "#e4e4e7"
+                        font.pixelSize: 15
+                        wrapMode: Text.WordWrap
+                        lineHeight: 1.4
+                        verticalAlignment: Text.AlignVCenter
                     }
                 }
             }
