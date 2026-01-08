@@ -365,6 +365,19 @@ ApplicationWindow {
             anchors.fill: parent
             visible: activeView === "chat"
 
+            property bool isGenerating: false
+            property string currentTitle: ""
+
+            Connections {
+                target: chatController
+                function onGenerationStarted() {
+                    chatView.isGenerating = true
+                }
+                function onGenerationStopped() {
+                    chatView.isGenerating = false
+                }
+            }
+
             ListView {
                 id: chatList
                 anchors.fill: parent
@@ -374,19 +387,60 @@ ApplicationWindow {
                 model: ListModel { id: messageModel }
                 clip: true
 
-                delegate: ColumnLayout {
+                delegate: Item {
                     width: chatList.width - 20
-                    spacing: 12
-                    Text {
-                        text: role === "user" ? "You" : "Digital Garden"
-                        color: role === "user" ? "#71717a" : "#3b82f6"
-                        font.bold: true; font.pixelSize: 12
-                    }
-                    Text {
-                        text: content; color: "#e4e4e7"
-                        font.pixelSize: 15; width: parent.width
-                        wrapMode: Text.WordWrap
-                        lineHeight: 1.4
+                    height: messageColumn.implicitHeight
+
+                    ColumnLayout {
+                        id: messageColumn
+                        anchors.fill: parent
+                        spacing: 12
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 12
+                            layoutDirection: role === "user" ? Qt.RightToLeft : Qt.LeftToRight
+
+                            Text {
+                                text: role === "user" ? "You" : "Digital Garden"
+                                color: role === "user" ? "#71717a" : "#3b82f6"
+                                font.bold: true
+                                font.pixelSize: 12
+                            }
+                        }
+
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 1
+                            color: "#1d1d20"
+                            visible: index > 0
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 12
+                            layoutDirection: role === "user" ? Qt.RightToLeft : Qt.LeftToRight
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: role === "user" ? 0.7 : 1.0
+                                color: role === "user" ? "#27272a" : "transparent"
+                                radius: 12
+                                implicitHeight: messageText.implicitHeight + 20
+
+                                Text {
+                                    id: messageText
+                                    anchors.fill: parent
+                                    anchors.margins: 10
+                                    text: content
+                                    color: "#e4e4e7"
+                                    font.pixelSize: 15
+                                    wrapMode: Text.WordWrap
+                                    lineHeight: 1.4
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -434,27 +488,46 @@ ApplicationWindow {
                         Layout.preferredWidth: 32
                         Layout.preferredHeight: 32
                         Layout.alignment: Qt.AlignVCenter
+                        enabled: inputField.text.length > 0 || chatView.isGenerating
                         
                         contentItem: Item {
                             Image {
+                                id: sendIcon
                                 anchors.centerIn: parent
                                 width: 16
                                 height: 16
-                                source: inputField.text.length > 0 ? "img/发送.svg" : "img/发送-Empty.svg"
+                                source: chatView.isGenerating ? "img/停止.svg" : (inputField.text.length > 0 ? "img/发送.svg" : "img/发送-Empty.svg")
                                 sourceSize: Qt.size(16, 16)
                                 opacity: 1.0
+                                visible: !chatView.isGenerating
+                            }
+                            
+                            BusyIndicator {
+                                id: loadingIndicator
+                                anchors.centerIn: parent
+                                width: 16
+                                height: 16
+                                running: chatView.isGenerating
+                                visible: chatView.isGenerating
                             }
                         }
                         
                         background: Rectangle {
                             radius: 16
-                            color: inputField.text.length > 0 ? "white" : "#27272a"
+                            color: (chatView.isGenerating || inputField.text.length > 0) ? "white" : "#27272a"
                             Behavior on color { ColorAnimation { duration: 200 } }
                         }
                         
                         onClicked: {
-                            if (inputField.text.trim() !== "") {
+                            if (chatView.isGenerating) {
+                                chatController.stop_generation()
+                            } else if (inputField.text.trim() !== "") {
                                 messageModel.append({"role": "user", "content": inputField.text})
+                                
+                                if (chatView.currentTitle === "") {
+                                    chatView.currentTitle = inputField.text
+                                }
+                                
                                 chatController.send_message(inputField.text)
                                 inputField.clear()
                                 chatList.positionViewAtEnd()
