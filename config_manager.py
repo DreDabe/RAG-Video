@@ -21,6 +21,15 @@ class ConfigManager(QObject):
             },
             'general': {
                 'language': '简体中文'
+            },
+            'knowledge_update': {
+                'platform': 'Bilibili',
+                'type': '收藏夹',
+                'url': 'https://www.bilibili.com/medialist/play/ml387412427',
+                'cookie': '',
+                'whisper_path': 'utils/whisper',
+                'ollama_url': 'http://localhost:11434/api/generate',
+                'ollama_model': 'deepseek-r1:8b'
             }
         }
         
@@ -112,3 +121,66 @@ class ConfigManager(QObject):
     @Slot(str)
     def set_language(self, value):
         self.set_general_config('language', value)
+
+    @Slot(result=str)
+    def get_knowledge_platform(self):
+        return self.config.get('knowledge_update', {}).get('platform', 'Bilibili')
+
+    @Slot(result=str)
+    def get_knowledge_type(self):
+        return self.config.get('knowledge_update', {}).get('type', '收藏夹')
+
+    @Slot(result=str)
+    def get_knowledge_url(self):
+        return self.config.get('knowledge_update', {}).get('url', '')
+
+    @Slot(result=str)
+    def get_knowledge_cookie(self):
+        return self.config.get('knowledge_update', {}).get('cookie', '')
+
+    @Slot(result=str)
+    def get_whisper_path(self):
+        return self.config.get('knowledge_update', {}).get('whisper_path', 'utils/whisper')
+
+    @Slot(result=str)
+    def get_ollama_url(self):
+        return self.config.get('knowledge_update', {}).get('ollama_url', 'http://localhost:11434/api/generate')
+
+    @Slot(result=str)
+    def get_ollama_model(self):
+        return self.config.get('knowledge_update', {}).get('ollama_model', 'deepseek-r1:8b')
+
+    @Slot(str)
+    def set_knowledge_platform(self, value):
+        self._set_knowledge_config('platform', value)
+
+    @Slot(str)
+    def set_knowledge_type(self, value):
+        self._set_knowledge_config('type', value)
+
+    @Slot(str)
+    def set_knowledge_url(self, value):
+        self._set_knowledge_config('url', value)
+
+    @Slot(str)
+    def set_knowledge_cookie(self, value):
+        self._set_knowledge_config('cookie', value)
+
+    @Slot(str)
+    def set_whisper_path(self, value):
+        self._set_knowledge_config('whisper_path', value)
+
+    @Slot(str)
+    def set_ollama_url(self, value):
+        self._set_knowledge_config('ollama_url', value)
+
+    @Slot(str)
+    def set_ollama_model(self, value):
+        self._set_knowledge_config('ollama_model', value)
+
+    def _set_knowledge_config(self, key, value):
+        if 'knowledge_update' not in self.config:
+            self.config['knowledge_update'] = {}
+        self.config['knowledge_update'][key] = value
+        self.save_config()
+        self.configChanged.emit()

@@ -7,5 +7,14 @@
   },
   "general": {
     "language": "简体中文"
+  },
+  "knowledge_update": {
+    "platform": "Bilibili",
+    "type": "收藏夹",
+    "url": "https://www.bilibili.com/medialist/play/ml387412427",
+    "cookie": "",
+    "whisper_path": "utils/whisper",
+    "ollama_url": "http://localhost:11434/api/generate",
+    "ollama_model": "deepseek-r1:8b"
   }
 }

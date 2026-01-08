@@ -9,6 +9,7 @@ from PySide6.QtQuickControls2 import QQuickStyle
 from conversation_manager import ConversationManager
 from config_manager import ConfigManager
 from markdown_formatter import MarkdownFormatter
+from knowledge_updater import KnowledgeUpdater
 
 
 class ChatController(QObject):
@@ -93,9 +94,11 @@ if __name__ == "__main__":
 
     config_manager = ConfigManager()
     controller = ChatController()
+    knowledge_updater = KnowledgeUpdater(config_manager)
     engine.rootContext().setContextProperty("chatController", controller)
     engine.rootContext().setContextProperty("conversationManager", controller.conversation_manager)
     engine.rootContext().setContextProperty("configManager", config_manager)
+    engine.rootContext().setContextProperty("knowledgeUpdater", knowledge_updater)
     engine.rootContext().setContextProperty("markdownFormatter", controller.markdown_formatter)
 
     qml_file = Path(__file__).parent / "main.qml"

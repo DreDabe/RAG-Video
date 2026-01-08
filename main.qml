@@ -32,7 +32,12 @@ ApplicationWindow {
     }
 
     function loadMessages() {
-        console.log("Loading messages for conversation:", conversationManager.current_conversation_id)
+        var currentId = conversationManager.current_conversation_id
+        if (!currentId) {
+            console.log("No current conversation, skipping message load")
+            return
+        }
+        console.log("Loading messages for conversation:", currentId)
         messageModel.clear()
         var messages = conversationManager.get_current_messages()
         console.log("Messages count:", messages.length)
@@ -309,10 +314,24 @@ ApplicationWindow {
                 isAccent: true
                 viewTarget: "chat"
                 onClicked: {
-                    if (!conversationManager.has_messages()) {
+                    console.log("=== New conversation button clicked ===")
+                    console.log("Has empty title conversation:", conversationManager.has_empty_title_conversation())
+                    if (!conversationManager.has_empty_title_conversation()) {
+                        console.log("Creating new conversation...")
                         conversationManager.create_new_conversation()
                         window.activeView = "chat"
                         loadMessages()
+                    } else {
+                        console.log("Switching to empty title conversation...")
+                        for (var i = 0; i < conversationModel.count; i++) {
+                            var conv = conversationModel.get(i)
+                            if (!conv.title || conv.title.trim() === "") {
+                                console.log("Found empty title conversation, ID:", conv.id)
+                                conversationManager.load_conversation(conv.id)
+                                loadMessages()
+                                break
+                            }
+                        }
                     }
                 }
             }
@@ -452,8 +471,11 @@ ApplicationWindow {
                             }
                             
                             onClicked: {
-                                console.log("More button clicked, conversation id:", model.id)
+                                console.log("=== More button clicked ===")
+                                console.log("Conversation ID from model:", model.id)
+                                console.log("Conversation ID type:", typeof model.id)
                                 window.conversationToDelete = model.id
+                                console.log("window.conversationToDelete set to:", window.conversationToDelete)
                                 actionMenu.open()
                             }
                             
@@ -605,9 +627,18 @@ ApplicationWindow {
                     Layout.fillWidth: true
                     text: "删除"
                     onClicked: {
-                        if (deleteConfirmPopup.conversationToDelete !== "") {
-                            conversationManager.delete_conversation(deleteConfirmPopup.conversationToDelete)
+                        console.log("=== Delete button clicked ===")
+                        console.log("conversationToDelete:", conversationToDelete)
+                        console.log("conversationToDelete type:", typeof conversationToDelete)
+                        console.log("conversationToDelete === '':", conversationToDelete === "")
+                        console.log("conversationToDelete !== '':", conversationToDelete !== "")
+                        
+                        if (conversationToDelete !== "") {
+                            console.log("Calling conversationManager.delete_conversation with ID:", conversationToDelete)
+                            conversationManager.delete_conversation(conversationToDelete)
                             deleteConfirmPopup.close()
+                        } else {
+                            console.log("ERROR: conversationToDelete is empty, not deleting!")
                         }
                     }
                     
@@ -628,7 +659,10 @@ ApplicationWindow {
         }
         
         function openDeleteConfirm(conversationId) {
+            console.log("openDeleteConfirm called with ID:", conversationId)
+            console.log("ID type:", typeof conversationId)
             conversationToDelete = conversationId
+            console.log("conversationToDelete set to:", conversationToDelete)
             open()
         }
     }
@@ -655,9 +689,11 @@ ApplicationWindow {
             Connections {
                 target: chatController
                 function onGenerationStarted() {
+                    console.log("=== Generation started ===")
                     chatView.isGenerating = true
                 }
                 function onGenerationStopped() {
+                    console.log("=== Generation stopped ===")
                     chatView.isGenerating = false
                 }
             }
@@ -982,6 +1018,40 @@ ApplicationWindow {
             anchors.fill: parent
             visible: activeView === "update"
 
+            property bool isRunning: knowledgeUpdater ? knowledgeUpdater.is_running_status() : false
+
+            Component.onCompleted: {
+                Qt.callLater(function() {
+                    platformCombo.currentIndex = platformCombo.find(configManager.get_knowledge_platform())
+                    typeCombo.currentIndex = typeCombo.find(configManager.get_knowledge_type())
+                    urlField.text = configManager.get_knowledge_url()
+                    cookieField.text = configManager.get_knowledge_cookie()
+                })
+            }
+
+            Connections {
+                target: knowledgeUpdater
+                function onLogUpdated(message) {
+                    logArea.text += "\n" + message
+                    logArea.cursorPosition = logArea.text.length
+                }
+                function onUpdateStarted() {
+                    updateView.isRunning = true
+                    runUpdateBtn.enabled = false
+                    stopUpdateBtn.enabled = true
+                }
+                function onUpdateStopped() {
+                    updateView.isRunning = false
+                    runUpdateBtn.enabled = true
+                    stopUpdateBtn.enabled = false
+                }
+                function onUpdateFinished() {
+                    updateView.isRunning = false
+                    runUpdateBtn.enabled = true
+                    stopUpdateBtn.enabled = false
+                }
+            }
+
             ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: 40
@@ -1017,6 +1087,9 @@ ApplicationWindow {
                             }
                             contentItem: Text { text: platformCombo.displayText; color: "white"; leftPadding: 12; verticalAlignment: Text.AlignVCenter }
                             background: Rectangle { color: "#09090b"; radius: 8; border.color: "#27272a" }
+                            onActivated: {
+                                configManager.set_knowledge_platform(currentText)
+                            }
                         }
                     }
 
@@ -1037,6 +1110,9 @@ ApplicationWindow {
                             }
                             contentItem: Text { text: typeCombo.displayText; color: "white"; leftPadding: 12; verticalAlignment: Text.AlignVCenter }
                             background: Rectangle { color: "#09090b"; radius: 8; border.color: "#27272a" }
+                            onActivated: {
+                                configManager.set_knowledge_type(currentText)
+                            }
                         }
                     }
                 }
@@ -1046,13 +1122,16 @@ ApplicationWindow {
                     spacing: 8
                     Text { text: "地址（URL）"; color: "#a1a1aa"; font.pixelSize: 12 }
                     TextField { 
-                        text: "https://www.bilibili.com/medialist/play/ml387412427"
+                        id: urlField
                         Layout.fillWidth: true
                         Layout.preferredHeight: 40
                         color: "white"
                         font.pixelSize: 13
                         verticalAlignment: Text.AlignVCenter
                         leftPadding: 12
+                        onTextChanged: {
+                            configManager.set_knowledge_url(text)
+                        }
                         background: Rectangle {
                             color: "#09090b"
                             radius: 8
@@ -1072,10 +1151,14 @@ ApplicationWindow {
                         Layout.fillHeight: true
                         ScrollBar.vertical.policy: ScrollBar.AsNeeded
                         TextArea {
+                            id: cookieField
                             placeholderText: "粘贴视频平台 Cookie 于此..."
                             color: "white"
                             font.family: "Consolas, Monospace"
                             font.pixelSize: 13
+                            onTextChanged: {
+                                configManager.set_knowledge_cookie(text)
+                            }
                             background: Rectangle { color: "#18181b"; radius: 8; border.color: "#27272a" }
                             wrapMode: TextArea.Wrap
                         }
@@ -1098,6 +1181,7 @@ ApplicationWindow {
                             anchors.margins: 10
                             ScrollBar.vertical.policy: ScrollBar.AsNeeded
                             TextArea {
+                                id: logArea
                                 readOnly: true
                                 text: "> 等待任务启动...\n> 准备更新知识库..."
                                 color: "#10b981"
@@ -1109,28 +1193,62 @@ ApplicationWindow {
                     }
                 }
 
-                Button {
-                    id: runUpdateBtn
+                RowLayout {
                     Layout.alignment: Qt.AlignHCenter
-                    Layout.preferredWidth: 260
-                    Layout.preferredHeight: 45
                     Layout.topMargin: 10
                     Layout.bottomMargin: 10
+                    spacing: 12
 
-                    contentItem: Text {
-                        text: "开始更新知识库"
-                        color: "white"
-                        font.weight: Font.Medium
-                        font.pixelSize: 16
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
+                    Button {
+                        id: runUpdateBtn
+                        Layout.preferredWidth: 260
+                        Layout.preferredHeight: 45
+                        enabled: !isRunning
+
+                        contentItem: Text {
+                            text: "开始更新知识库"
+                            color: "white"
+                            font.weight: Font.Medium
+                            font.pixelSize: 16
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                        background: Rectangle {
+                            color: runUpdateBtn.hovered ? "#3f3f46" : "#27272a"
+                            radius: 8
+                            border.color: "#3f3f46"
+                            border.width: 1
+                            Behavior on color { ColorAnimation { duration: 150 } }
+                        }
+                        onClicked: {
+                            knowledgeUpdater.start_update()
+                        }
                     }
-                    background: Rectangle {
-                        color: runUpdateBtn.hovered ? "#3f3f46" : "#27272a"
-                        radius: 8
-                        border.color: "#3f3f46"
-                        border.width: 1
-                        Behavior on color { ColorAnimation { duration: 150 } }
+
+                    Button {
+                        id: stopUpdateBtn
+                        Layout.preferredWidth: 260
+                        Layout.preferredHeight: 45
+                        enabled: isRunning
+
+                        contentItem: Text {
+                            text: "停止更新"
+                            color: "white"
+                            font.weight: Font.Medium
+                            font.pixelSize: 16
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                        background: Rectangle {
+                            color: stopUpdateBtn.hovered ? "#ef4444" : "#dc2626"
+                            radius: 8
+                            border.color: "#ef4444"
+                            border.width: 1
+                            Behavior on color { ColorAnimation { duration: 150 } }
+                        }
+                        onClicked: {
+                            knowledgeUpdater.stop_update()
+                        }
                     }
                 }
             }

@@ -123,8 +123,21 @@ class ConversationManager(QObject):
 
     @Slot(str)
     def delete_conversation(self, conversation_id):
-        print(f"Deleting conversation: {conversation_id}")
+        print(f"=== Delete Conversation Called ===")
+        print(f"Conversation ID to delete (raw): {conversation_id}")
+        print(f"Conversation ID type: {type(conversation_id)}")
+        
+        conversation_id = str(conversation_id)
+        print(f"Conversation ID to delete (converted): {conversation_id}")
+        print(f"Conversation ID type (converted): {type(conversation_id)}")
+        
+        if not conversation_id or conversation_id == "":
+            print("ERROR: conversation_id is None or empty!")
+            return
+        
         print(f"Current conversations before delete: {len(self.conversations)}")
+        for i, conv in enumerate(self.conversations):
+            print(f"  Conversation {i}: ID={conv['id']}, Title={conv.get('title', 'N/A')}")
         
         self.conversations = [c for c in self.conversations if c['id'] != conversation_id]
         
@@ -136,11 +149,15 @@ class ConversationManager(QObject):
                 print(f"New current conversation ID: {self._current_conversation_id}")
             else:
                 self._current_conversation_id = None
+                print("Creating new conversation because no conversations left")
                 self.create_new_conversation()
         
+        print("Saving conversations to file...")
         self.save_conversations()
+        print("Emitting signals...")
         self.conversationListChanged.emit()
         self.currentConversationChanged.emit()
+        print("=== Delete Conversation Completed ===")
 
     @Slot(str, str)
     def rename_conversation(self, conversation_id, new_title):
@@ -191,7 +208,11 @@ class ConversationManager(QObject):
     
     @Slot(result=bool)
     def has_messages(self):
-        conversation = self.get_current_conversation()
-        if conversation and len(conversation['messages']) > 0:
-            return True
+        return False
+    
+    @Slot(result=bool)
+    def has_empty_title_conversation(self):
+        for conv in self.conversations:
+            if not conv.get('title') or conv['title'].strip() == '':
+                return True
         return False
