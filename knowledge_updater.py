@@ -7,6 +7,7 @@ import requests
 import yt_dlp
 from faster_whisper import WhisperModel
 from config.platform_config import get_platform_config, is_type_supported
+from config.model_config import get_model_config
 
 
 class BasePlatformHandler:
@@ -24,6 +25,10 @@ class BasePlatformHandler:
     def process(self, url, cookie_text):
         """处理入口方法"""
         raise NotImplementedError("子类必须实现 process 方法")
+
+    def _log(self, message):
+        """记录日志"""
+        self.log(message)
 
 
 class BilibiliPlaylistHandler(BasePlatformHandler):
@@ -178,7 +183,7 @@ class BilibiliPlaylistHandler(BasePlatformHandler):
             return []
     
     def _analyze_with_ollama(self, title, url, text_data, frames):
-        """使用Ollama进行AI分析"""
+        """使用AI模型进行分析"""
         self._log("[*] 正在请求 AI 进行深度详细分析...")
         
         try:
@@ -194,21 +199,147 @@ URL：{url}
 内容：{self._smart_truncate(text_data, 2000)}
 """
             
-            ollama_url = self.config_manager.get_ollama_url()
-            ollama_model = self.config_manager.get_ollama_model()
+            # 获取模型配置
+            provider = self.config_manager.get_model_provider()
+            model_config = get_model_config(provider)
             
-            payload = {
-                "model": ollama_model,
-                "prompt": prompt,
-                "stream": False
-            }
+            self._log(f"[*] 使用模型供应商: {provider}")
+            self._log(f"[*] 使用模型: {model_config['model_name']}")
             
-            res = requests.post(ollama_url, json=payload, timeout=300)
-            if res.status_code == 200:
-                response_json = res.json()
-                ai_res = response_json.get("response", "").strip()
+            # 根据供应商构建请求
+            if provider == "ollama":
+                # Ollama API
+                ollama_url = f"{model_config['base_url']}/generate"
+                payload = {
+                    "model": model_config['model_name'],
+                    "prompt": prompt,
+                    "stream": False
+                }
+                
+                headers = {}
+                if model_config['api_key']:
+                    headers["Authorization"] = f"Bearer {model_config['api_key']}"
+                
+                res = requests.post(ollama_url, json=payload, headers=headers, timeout=300)
+                if res.status_code == 200:
+                    response_json = res.json()
+                    ai_res = response_json.get("response", "").strip()
+                else:
+                    ai_res = ""
+                    
+            elif provider == "openai":
+                # OpenAI API
+                openai_url = f"{model_config['base_url']}/chat/completions"
+                payload = {
+                    "model": model_config['model_name'],
+                    "messages": [
+                        {"role": "user", "content": prompt}
+                    ],
+                    "temperature": 0.7
+                }
+                
+                headers = {
+                    "Content-Type": "application/json"
+                }
+                if model_config['api_key']:
+                    headers["Authorization"] = f"Bearer {model_config['api_key']}"
+                
+                res = requests.post(openai_url, json=payload, headers=headers, timeout=300)
+                if res.status_code == 200:
+                    response_json = res.json()
+                    ai_res = response_json.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                else:
+                    ai_res = ""
+                    
+            elif provider == "anthropic":
+                # Anthropic API
+                anthropic_url = f"{model_config['base_url']}/messages"
+                payload = {
+                    "model": model_config['model_name'],
+                    "messages": [
+                        {"role": "user", "content": prompt}
+                    ],
+                    "max_tokens": 2000
+                }
+                
+                headers = {
+                    "Content-Type": "application/json"
+                }
+                if model_config['api_key']:
+                    headers["x-api-key"] = model_config['api_key']
+                
+                res = requests.post(anthropic_url, json=payload, headers=headers, timeout=300)
+                if res.status_code == 200:
+                    response_json = res.json()
+                    ai_res = response_json.get("content", [{}])[0].get("text", "").strip()
+                else:
+                    ai_res = ""
+                    
+            elif provider == "qwen":
+                # 通义千问 API
+                qwen_url = f"{model_config['base_url']}/services/aigc/text-generation/generation"
+                payload = {
+                    "model": model_config['model_name'],
+                    "input": prompt,
+                    "parameters": {
+                        "temperature": 0.7,
+                        "max_tokens": 2000
+                    }
+                }
+                
+                headers = {
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {model_config['api_key']}"
+                }
+                
+                res = requests.post(qwen_url, json=payload, headers=headers, timeout=300)
+                if res.status_code == 200:
+                    response_json = res.json()
+                    ai_res = response_json.get("output", {}).get("text", "").strip()
+                else:
+                    ai_res = ""
+                    
+            elif provider == "deepseek":
+                # 深度求索 API
+                deepseek_url = f"{model_config['base_url']}/chat/completions"
+                payload = {
+                    "model": model_config['model_name'],
+                    "messages": [
+                        {"role": "user", "content": prompt}
+                    ],
+                    "temperature": 0.7,
+                    "max_tokens": 2000
+                }
+                
+                headers = {
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {model_config['api_key']}"
+                }
+                
+                res = requests.post(deepseek_url, json=payload, headers=headers, timeout=300)
+                if res.status_code == 200:
+                    response_json = res.json()
+                    ai_res = response_json.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                else:
+                    ai_res = ""
+                    
             else:
-                ai_res = ""
+                # 默认使用Ollama
+                ollama_url = self.config_manager.get_ollama_url()
+                ollama_model = self.config_manager.get_ollama_model()
+                
+                payload = {
+                    "model": ollama_model,
+                    "prompt": prompt,
+                    "stream": False
+                }
+                
+                res = requests.post(ollama_url, json=payload, timeout=300)
+                if res.status_code == 200:
+                    response_json = res.json()
+                    ai_res = response_json.get("response", "").strip()
+                else:
+                    ai_res = ""
             
             if not ai_res:
                 return ""
@@ -322,9 +453,9 @@ class KnowledgeUpdater(QObject):
         self.is_running = False
         self.should_stop = False
         self.log_buffer = []
+        self.whisper_model = None
         
         self._init_paths()
-        self._init_whisper()
     
     def _init_paths(self):
         """初始化路径"""
@@ -396,6 +527,9 @@ class KnowledgeUpdater(QObject):
         if self.is_running:
             self._log("[!] 更新任务已在运行中")
             return
+        
+        # 初始化Whisper模型
+        self._init_whisper()
         
         if not self.whisper_model:
             self._log("[-] Whisper 模型未加载，无法启动更新")

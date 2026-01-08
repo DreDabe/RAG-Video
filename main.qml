@@ -388,7 +388,7 @@ ApplicationWindow {
                             Text {
                                 anchors.centerIn: parent
                                 text: "•"
-                                color: (listDel.hovered || String(model.id) === String(conversationManager.current_conversation_id)) ? "white" : "#3f3f46"
+                                color: (listDel.hovered || (conversationManager.current_conversation_id !== null && String(model.id) === String(conversationManager.current_conversation_id))) ? "white" : "#3f3f46"
                                 font.pixelSize: 20
                                 visible: sidebarExpanded
                             }
@@ -404,7 +404,7 @@ ApplicationWindow {
                                 id: titleText
                                 anchors.fill: parent
                                 text: model.title
-                                color: (listDel.hovered || String(model.id) === String(conversationManager.current_conversation_id)) ? "white" : "#a1a1aa"
+                                color: (listDel.hovered || (conversationManager.current_conversation_id !== null && String(model.id) === String(conversationManager.current_conversation_id))) ? "white" : "#a1a1aa"
                                 font.pixelSize: 13
                                 elide: Text.ElideRight
                                 verticalAlignment: Text.AlignVCenter
@@ -896,6 +896,24 @@ ApplicationWindow {
                     appUrlField.fieldText = configManager.get_app_url()
                     appApiField.fieldText = configManager.get_app_api()
                     languageCombo.currentIndex = languageCombo.find(configManager.get_language())
+                    
+                    // 初始化模型配置
+                    modelProviderCombo.currentIndex = modelProviderCombo.find(configManager.get_model_provider())
+                    ollamaBaseUrlField.fieldText = configManager.get_ollama_base_url()
+                    ollamaModelNameField.fieldText = configManager.get_ollama_model_name()
+                    ollamaApiKeyField.fieldText = configManager.get_ollama_api_key()
+                    openaiBaseUrlField.fieldText = configManager.get_openai_base_url()
+                    openaiModelNameField.fieldText = configManager.get_openai_model_name()
+                    openaiApiKeyField.fieldText = configManager.get_openai_api_key()
+                    anthropicBaseUrlField.fieldText = configManager.get_anthropic_base_url()
+                    anthropicModelNameField.fieldText = configManager.get_anthropic_model_name()
+                    anthropicApiKeyField.fieldText = configManager.get_anthropic_api_key()
+                    qwenBaseUrlField.fieldText = configManager.get_qwen_base_url()
+                    qwenModelNameField.fieldText = configManager.get_qwen_model_name()
+                    qwenApiKeyField.fieldText = configManager.get_qwen_api_key()
+                    deepseekBaseUrlField.fieldText = configManager.get_deepseek_base_url()
+                    deepseekModelNameField.fieldText = configManager.get_deepseek_model_name()
+                    deepseekApiKeyField.fieldText = configManager.get_deepseek_api_key()
                 })
             }
             
@@ -908,6 +926,29 @@ ApplicationWindow {
                         appUrlField.fieldText = configManager.get_app_url()
                         appApiField.fieldText = configManager.get_app_api()
                         languageCombo.currentIndex = languageCombo.find(configManager.get_language())
+                        
+                        // 更新模型配置
+                        Qt.callLater(function() {
+                            var providerIndex = modelProviderCombo.find(configManager.get_model_provider())
+                            if (providerIndex >= 0) {
+                                modelProviderCombo.currentIndex = providerIndex
+                            }
+                            ollamaBaseUrlField.fieldText = configManager.get_ollama_base_url()
+                            ollamaModelNameField.fieldText = configManager.get_ollama_model_name()
+                            ollamaApiKeyField.fieldText = configManager.get_ollama_api_key()
+                            openaiBaseUrlField.fieldText = configManager.get_openai_base_url()
+                            openaiModelNameField.fieldText = configManager.get_openai_model_name()
+                            openaiApiKeyField.fieldText = configManager.get_openai_api_key()
+                            anthropicBaseUrlField.fieldText = configManager.get_anthropic_base_url()
+                            anthropicModelNameField.fieldText = configManager.get_anthropic_model_name()
+                            anthropicApiKeyField.fieldText = configManager.get_anthropic_api_key()
+                            qwenBaseUrlField.fieldText = configManager.get_qwen_base_url()
+                            qwenModelNameField.fieldText = configManager.get_qwen_model_name()
+                            qwenApiKeyField.fieldText = configManager.get_qwen_api_key()
+                            deepseekBaseUrlField.fieldText = configManager.get_deepseek_base_url()
+                            deepseekModelNameField.fieldText = configManager.get_deepseek_model_name()
+                            deepseekApiKeyField.fieldText = configManager.get_deepseek_api_key()
+                        })
                     })
                 }
             }
@@ -933,6 +974,7 @@ ApplicationWindow {
                             property string configKey: ""
                             property string configType: "dify"
                             property alias fieldText: settingField.text
+                            signal settingTextChanged(string text)
                             Layout.fillWidth: true
                             spacing: 8
                             Text { text: label; color: "#a1a1aa"; font.pixelSize: 12 }
@@ -953,6 +995,7 @@ ApplicationWindow {
                                     } else if (configType === "general") {
                                         if (configKey === "language") configManager.set_language(text)
                                     }
+                                    settingTextChanged(text)
                                 }
                                 background: Rectangle {
                                     color: "#09090b"
@@ -1007,17 +1050,185 @@ ApplicationWindow {
                                 background: Rectangle { color: "#09090b"; radius: 8; border.color: "#27272a" }
                             }
                         }
+
+                        Text { text: "模型配置"; color: "#3b82f6"; font.pixelSize: 14; Layout.topMargin: 20 }
+                        
+                        // 模型供应商选择
+                        RowLayout {
+                            Text { text: "模型供应商"; color: "#a1a1aa"; Layout.fillWidth: true }
+                            ComboBox { 
+                                id: modelProviderCombo
+                                model: ["ollama", "openai", "anthropic", "qwen", "deepseek"]
+                                Layout.preferredWidth: 150
+                                onActivated: {
+                                    configManager.set_model_provider(currentText)
+                                }
+                                delegate: ItemDelegate {
+                                    width: modelProviderCombo.width
+                                    contentItem: Text { text: modelData; color: "white"; verticalAlignment: Text.AlignVCenter }
+                                    background: Rectangle { color: hovered ? "#27272a" : "#18181b" }
+                                }
+                                contentItem: Text { text: modelProviderCombo.displayText; color: "white"; leftPadding: 12; verticalAlignment: Text.AlignVCenter }
+                                background: Rectangle { color: "#09090b"; radius: 8; border.color: "#27272a" }
+                            }
+                        }
+                        
+                        // Ollama 配置
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+                            visible: modelProviderCombo.currentText === "ollama"
+                            
+                            SettingInput { 
+                                label: "Ollama Base URL"; 
+                                configKey: "ollama_base_url"
+                                configType: "model"
+                                id: ollamaBaseUrlField
+                                onSettingTextChanged: function(text) { configManager.set_ollama_base_url(text) }
+                            }
+                            SettingInput { 
+                                label: "Ollama Model Name"; 
+                                configKey: "ollama_model_name"
+                                configType: "model"
+                                id: ollamaModelNameField
+                                onSettingTextChanged: function(text) { configManager.set_ollama_model_name(text) }
+                            }
+                            SettingInput { 
+                                label: "Ollama API Key (可选)"; 
+                                configKey: "ollama_api_key"
+                                configType: "model"
+                                id: ollamaApiKeyField
+                                onSettingTextChanged: function(text) { configManager.set_ollama_api_key(text) }
+                            }
+                        }
+                        
+                        // OpenAI 配置
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+                            visible: modelProviderCombo.currentText === "openai"
+                            
+                            SettingInput { 
+                                label: "OpenAI Base URL"; 
+                                configKey: "openai_base_url"
+                                configType: "model"
+                                id: openaiBaseUrlField
+                                onSettingTextChanged: function(text) { configManager.set_openai_base_url(text) }
+                            }
+                            SettingInput { 
+                                label: "OpenAI Model Name"; 
+                                configKey: "openai_model_name"
+                                configType: "model"
+                                id: openaiModelNameField
+                                onSettingTextChanged: function(text) { configManager.set_openai_model_name(text) }
+                            }
+                            SettingInput { 
+                                label: "OpenAI API Key"; 
+                                configKey: "openai_api_key"
+                                configType: "model"
+                                id: openaiApiKeyField
+                                onSettingTextChanged: function(text) { configManager.set_openai_api_key(text) }
+                            }
+                        }
+                        
+                        // Anthropic 配置
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+                            visible: modelProviderCombo.currentText === "anthropic"
+                            
+                            SettingInput { 
+                                label: "Anthropic Base URL"; 
+                                configKey: "anthropic_base_url"
+                                configType: "model"
+                                id: anthropicBaseUrlField
+                                onSettingTextChanged: function(text) { configManager.set_anthropic_base_url(text) }
+                            }
+                            SettingInput { 
+                                label: "Anthropic Model Name"; 
+                                configKey: "anthropic_model_name"
+                                configType: "model"
+                                id: anthropicModelNameField
+                                onSettingTextChanged: function(text) { configManager.set_anthropic_model_name(text) }
+                            }
+                            SettingInput { 
+                                label: "Anthropic API Key"; 
+                                configKey: "anthropic_api_key"
+                                configType: "model"
+                                id: anthropicApiKeyField
+                                onSettingTextChanged: function(text) { configManager.set_anthropic_api_key(text) }
+                            }
+                        }
+                        
+                        // 通义千问配置
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+                            visible: modelProviderCombo.currentText === "qwen"
+                            
+                            SettingInput { 
+                                label: "Qwen Base URL"; 
+                                configKey: "qwen_base_url"
+                                configType: "model"
+                                id: qwenBaseUrlField
+                                onSettingTextChanged: function(text) { configManager.set_qwen_base_url(text) }
+                            }
+                            SettingInput { 
+                                label: "Qwen Model Name"; 
+                                configKey: "qwen_model_name"
+                                configType: "model"
+                                id: qwenModelNameField
+                                onSettingTextChanged: function(text) { configManager.set_qwen_model_name(text) }
+                            }
+                            SettingInput { 
+                                label: "Qwen API Key"; 
+                                configKey: "qwen_api_key"
+                                configType: "model"
+                                id: qwenApiKeyField
+                                onSettingTextChanged: function(text) { configManager.set_qwen_api_key(text) }
+                            }
+                        }
+                        
+                        // 深度求索配置
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+                            visible: modelProviderCombo.currentText === "deepseek"
+                            
+                            SettingInput { 
+                                label: "DeepSeek Base URL"; 
+                                configKey: "deepseek_base_url"
+                                configType: "model"
+                                id: deepseekBaseUrlField
+                                onSettingTextChanged: function(text) { configManager.set_deepseek_base_url(text) }
+                            }
+                            SettingInput { 
+                                label: "DeepSeek Model Name"; 
+                                configKey: "deepseek_model_name"
+                                configType: "model"
+                                id: deepseekModelNameField
+                                onSettingTextChanged: function(text) { configManager.set_deepseek_model_name(text) }
+                            }
+                            SettingInput { 
+                                label: "DeepSeek API Key"; 
+                                configKey: "deepseek_api_key"
+                                configType: "model"
+                                id: deepseekApiKeyField
+                                onSettingTextChanged: function(text) { configManager.set_deepseek_api_key(text) }
+                            }
+                        }
                     }
                 }
             }
         }
 
-        // ================== 视图 3: 更新知识库界面 (优化版) ==================
+        // ================== 视图 3: 更新知识库界面 (布局与交互优化版) ==================
         Item {
             id: updateView
             anchors.fill: parent
             visible: activeView === "update"
 
+            // 增加一个内部状态属性，确保 UI 响应更及时
             property bool isRunning: knowledgeUpdater ? knowledgeUpdater.is_running_status() : false
 
             Component.onCompleted: {
@@ -1035,21 +1246,9 @@ ApplicationWindow {
                     logArea.text += "\n" + message
                     logArea.cursorPosition = logArea.text.length
                 }
-                function onUpdateStarted() {
-                    updateView.isRunning = true
-                    runUpdateBtn.enabled = false
-                    stopUpdateBtn.enabled = true
-                }
-                function onUpdateStopped() {
-                    updateView.isRunning = false
-                    runUpdateBtn.enabled = true
-                    stopUpdateBtn.enabled = false
-                }
-                function onUpdateFinished() {
-                    updateView.isRunning = false
-                    runUpdateBtn.enabled = true
-                    stopUpdateBtn.enabled = false
-                }
+                function onUpdateStarted() { updateView.isRunning = true }
+                function onUpdateStopped() { updateView.isRunning = false }
+                function onUpdateFinished() { updateView.isRunning = false }
             }
 
             ColumnLayout {
@@ -1066,10 +1265,10 @@ ApplicationWindow {
                     Layout.bottomMargin: 10
                 }
 
+                // 视频平台与类型行 (保持不变)
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 20
-                    
                     ColumnLayout {
                         Layout.fillWidth: true
                         Layout.preferredWidth: 1
@@ -1080,6 +1279,7 @@ ApplicationWindow {
                             model: ["Bilibili"]
                             Layout.fillWidth: true
                             Layout.preferredHeight: 40
+                            onActivated: configManager.set_knowledge_platform(currentText)
                             delegate: ItemDelegate {
                                 width: platformCombo.width
                                 contentItem: Text { text: modelData; color: "white"; verticalAlignment: Text.AlignVCenter }
@@ -1087,12 +1287,8 @@ ApplicationWindow {
                             }
                             contentItem: Text { text: platformCombo.displayText; color: "white"; leftPadding: 12; verticalAlignment: Text.AlignVCenter }
                             background: Rectangle { color: "#09090b"; radius: 8; border.color: "#27272a" }
-                            onActivated: {
-                                configManager.set_knowledge_platform(currentText)
-                            }
                         }
                     }
-
                     ColumnLayout {
                         Layout.fillWidth: true
                         Layout.preferredWidth: 1
@@ -1103,6 +1299,7 @@ ApplicationWindow {
                             model: ["视频", "收藏夹"]
                             Layout.fillWidth: true
                             Layout.preferredHeight: 40
+                            onActivated: configManager.set_knowledge_type(currentText)
                             delegate: ItemDelegate {
                                 width: typeCombo.width
                                 contentItem: Text { text: modelData; color: "white"; verticalAlignment: Text.AlignVCenter }
@@ -1110,13 +1307,11 @@ ApplicationWindow {
                             }
                             contentItem: Text { text: typeCombo.displayText; color: "white"; leftPadding: 12; verticalAlignment: Text.AlignVCenter }
                             background: Rectangle { color: "#09090b"; radius: 8; border.color: "#27272a" }
-                            onActivated: {
-                                configManager.set_knowledge_type(currentText)
-                            }
                         }
                     }
                 }
 
+                // 地址 URL 行
                 ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 8
@@ -1129,9 +1324,7 @@ ApplicationWindow {
                         font.pixelSize: 13
                         verticalAlignment: Text.AlignVCenter
                         leftPadding: 12
-                        onTextChanged: {
-                            configManager.set_knowledge_url(text)
-                        }
+                        onTextChanged: configManager.set_knowledge_url(text)
                         background: Rectangle {
                             color: "#09090b"
                             radius: 8
@@ -1141,9 +1334,10 @@ ApplicationWindow {
                     }
                 }
 
+                // 1. Cookie 输入框 (设置为较小的高度，不自动填充剩余高度)
                 ColumnLayout {
                     Layout.fillWidth: true
-                    Layout.fillHeight: true
+                    Layout.preferredHeight: 20 // 设置一个固定的舒适高度
                     spacing: 8
                     Text { text: "Cookie (用于平台授权)"; color: "#a1a1aa"; font.pixelSize: 12 }
                     ScrollView {
@@ -1156,18 +1350,17 @@ ApplicationWindow {
                             color: "white"
                             font.family: "Consolas, Monospace"
                             font.pixelSize: 13
-                            onTextChanged: {
-                                configManager.set_knowledge_cookie(text)
-                            }
+                            onTextChanged: configManager.set_knowledge_cookie(text)
                             background: Rectangle { color: "#18181b"; radius: 8; border.color: "#27272a" }
                             wrapMode: TextArea.Wrap
                         }
                     }
                 }
 
+                // 2. 运行日志 (设置为 fillHeight，它将占据所有剩下的空间)
                 ColumnLayout {
                     Layout.fillWidth: true
-                    Layout.fillHeight: true
+                    Layout.fillHeight: true // 核心改动：使其占据主导地位
                     spacing: 8
                     Text { text: "运行日志"; color: "#a1a1aa"; font.pixelSize: 12 }
                     Rectangle {
@@ -1193,61 +1386,44 @@ ApplicationWindow {
                     }
                 }
 
-                RowLayout {
+                // 3. 合二为一的状态按钮
+                Button {
+                    id: toggleUpdateBtn
                     Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: 320
+                    Layout.preferredHeight: 48
                     Layout.topMargin: 10
                     Layout.bottomMargin: 10
-                    spacing: 12
 
-                    Button {
-                        id: runUpdateBtn
-                        Layout.preferredWidth: 260
-                        Layout.preferredHeight: 45
-                        enabled: !isRunning
-
-                        contentItem: Text {
-                            text: "开始更新知识库"
-                            color: "white"
-                            font.weight: Font.Medium
-                            font.pixelSize: 16
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                        }
-                        background: Rectangle {
-                            color: runUpdateBtn.hovered ? "#3f3f46" : "#27272a"
-                            radius: 8
-                            border.color: "#3f3f46"
-                            border.width: 1
-                            Behavior on color { ColorAnimation { duration: 150 } }
-                        }
-                        onClicked: {
-                            knowledgeUpdater.start_update()
-                        }
+                    // 动态文本
+                    contentItem: Text {
+                        text: updateView.isRunning ? "停止更新任务" : "开始更新知识库"
+                        color: "white"
+                        font.weight: Font.Medium
+                        font.pixelSize: 16
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
                     }
 
-                    Button {
-                        id: stopUpdateBtn
-                        Layout.preferredWidth: 260
-                        Layout.preferredHeight: 45
-                        enabled: isRunning
+                    // 动态背景色
+                    background: Rectangle {
+                        // 运行中显示红色，平时显示黑灰色
+                        color: updateView.isRunning 
+                               ? (toggleUpdateBtn.hovered ? "#ef4444" : "#dc2626") 
+                               : (toggleUpdateBtn.hovered ? "#3f3f46" : "#27272a")
+                        radius: 10
+                        border.color: updateView.isRunning ? "#ef4444" : "#3f3f46"
+                        border.width: 1
+                        Behavior on color { ColorAnimation { duration: 250 } }
+                    }
 
-                        contentItem: Text {
-                            text: "停止更新"
-                            color: "white"
-                            font.weight: Font.Medium
-                            font.pixelSize: 16
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                        }
-                        background: Rectangle {
-                            color: stopUpdateBtn.hovered ? "#ef4444" : "#dc2626"
-                            radius: 8
-                            border.color: "#ef4444"
-                            border.width: 1
-                            Behavior on color { ColorAnimation { duration: 150 } }
-                        }
-                        onClicked: {
+                    onClicked: {
+                        if (updateView.isRunning) {
                             knowledgeUpdater.stop_update()
+                        } else {
+                            // 清除旧日志开始新任务
+                            logArea.text = "> 任务启动中..."
+                            knowledgeUpdater.start_update()
                         }
                     }
                 }

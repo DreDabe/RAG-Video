@@ -30,6 +30,34 @@ class ConfigManager(QObject):
                 'whisper_path': 'utils/whisper',
                 'ollama_url': 'http://localhost:11434/api/generate',
                 'ollama_model': 'deepseek-r1:8b'
+            },
+            'model': {
+                'provider': 'ollama',
+                'ollama': {
+                    'base_url': 'http://localhost:11434/api',
+                    'model_name': 'deepseek-r1:8b',
+                    'api_key': ''
+                },
+                'openai': {
+                    'base_url': 'https://api.openai.com/v1',
+                    'model_name': 'gpt-3.5-turbo',
+                    'api_key': ''
+                },
+                'anthropic': {
+                    'base_url': 'https://api.anthropic.com/v1',
+                    'model_name': 'claude-3-sonnet-20240229',
+                    'api_key': ''
+                },
+                'qwen': {
+                    'base_url': 'https://dashscope.aliyuncs.com/api/v1',
+                    'model_name': 'qwen2.5-7b-instruct',
+                    'api_key': 'sk-2ce1bb163bde443bbd959da078b33f3d'
+                },
+                'deepseek': {
+                    'base_url': 'https://api.deepseek.com/v1',
+                    'model_name': 'deepseek-chat',
+                    'api_key': ''
+                }
             }
         }
         
@@ -182,5 +210,149 @@ class ConfigManager(QObject):
         if 'knowledge_update' not in self.config:
             self.config['knowledge_update'] = {}
         self.config['knowledge_update'][key] = value
+        self.save_config()
+        self.configChanged.emit()
+
+    @Slot(str)
+    def get_model_provider(self):
+        return self.config.get('model', {}).get('provider', 'ollama')
+
+    @Slot(str)
+    def set_model_provider(self, value):
+        self._set_model_config('provider', value)
+
+    @Slot(str, result=str)
+    def get_ollama_base_url(self):
+        return self.config.get('model', {}).get('ollama', {}).get('base_url', 'http://localhost:11434/api')
+
+    @Slot(str)
+    def set_ollama_base_url(self, value):
+        self._set_provider_config('ollama', 'base_url', value)
+
+    @Slot(str, result=str)
+    def get_ollama_model_name(self):
+        return self.config.get('model', {}).get('ollama', {}).get('model_name', 'qwen2:0.5b')
+
+    @Slot(str)
+    def set_ollama_model_name(self, value):
+        self._set_provider_config('ollama', 'model_name', value)
+
+    @Slot(str, result=str)
+    def get_ollama_api_key(self):
+        return self.config.get('model', {}).get('ollama', {}).get('api_key', '')
+
+    @Slot(str)
+    def set_ollama_api_key(self, value):
+        self._set_provider_config('ollama', 'api_key', value)
+
+    @Slot(str, result=str)
+    def get_openai_base_url(self):
+        return self.config.get('model', {}).get('openai', {}).get('base_url', 'https://api.openai.com/v1')
+
+    @Slot(str)
+    def set_openai_base_url(self, value):
+        self._set_provider_config('openai', 'base_url', value)
+
+    @Slot(str, result=str)
+    def get_openai_model_name(self):
+        return self.config.get('model', {}).get('openai', {}).get('model_name', 'gpt-3.5-turbo')
+
+    @Slot(str)
+    def set_openai_model_name(self, value):
+        self._set_provider_config('openai', 'model_name', value)
+
+    @Slot(str, result=str)
+    def get_openai_api_key(self):
+        return self.config.get('model', {}).get('openai', {}).get('api_key', '')
+
+    @Slot(str)
+    def set_openai_api_key(self, value):
+        self._set_provider_config('openai', 'api_key', value)
+
+    @Slot(str, result=str)
+    def get_anthropic_base_url(self):
+        return self.config.get('model', {}).get('anthropic', {}).get('base_url', 'https://api.anthropic.com/v1')
+
+    @Slot(str)
+    def set_anthropic_base_url(self, value):
+        self._set_provider_config('anthropic', 'base_url', value)
+
+    @Slot(str, result=str)
+    def get_anthropic_model_name(self):
+        return self.config.get('model', {}).get('anthropic', {}).get('model_name', 'claude-3-sonnet-20240229')
+
+    @Slot(str)
+    def set_anthropic_model_name(self, value):
+        self._set_provider_config('anthropic', 'model_name', value)
+
+    @Slot(str, result=str)
+    def get_anthropic_api_key(self):
+        return self.config.get('model', {}).get('anthropic', {}).get('api_key', '')
+
+    @Slot(str)
+    def set_anthropic_api_key(self, value):
+        self._set_provider_config('anthropic', 'api_key', value)
+
+    @Slot(str, result=str)
+    def get_qwen_base_url(self):
+        return self.config.get('model', {}).get('qwen', {}).get('base_url', 'https://dashscope.aliyuncs.com/api/v1')
+
+    @Slot(str)
+    def set_qwen_base_url(self, value):
+        self._set_provider_config('qwen', 'base_url', value)
+
+    @Slot(str, result=str)
+    def get_qwen_model_name(self):
+        return self.config.get('model', {}).get('qwen', {}).get('model_name', 'qwen2.5-7b-instruct')
+
+    @Slot(str)
+    def set_qwen_model_name(self, value):
+        self._set_provider_config('qwen', 'model_name', value)
+
+    @Slot(str, result=str)
+    def get_qwen_api_key(self):
+        return self.config.get('model', {}).get('qwen', {}).get('api_key', '')
+
+    @Slot(str)
+    def set_qwen_api_key(self, value):
+        self._set_provider_config('qwen', 'api_key', value)
+
+    @Slot(str, result=str)
+    def get_deepseek_base_url(self):
+        return self.config.get('model', {}).get('deepseek', {}).get('base_url', 'https://api.deepseek.com/v1')
+
+    @Slot(str)
+    def set_deepseek_base_url(self, value):
+        self._set_provider_config('deepseek', 'base_url', value)
+
+    @Slot(str, result=str)
+    def get_deepseek_model_name(self):
+        return self.config.get('model', {}).get('deepseek', {}).get('model_name', 'deepseek-chat')
+
+    @Slot(str)
+    def set_deepseek_model_name(self, value):
+        self._set_provider_config('deepseek', 'model_name', value)
+
+    @Slot(str, result=str)
+    def get_deepseek_api_key(self):
+        return self.config.get('model', {}).get('deepseek', {}).get('api_key', '')
+
+    @Slot(str)
+    def set_deepseek_api_key(self, value):
+        self._set_provider_config('deepseek', 'api_key', value)
+
+    def _set_model_config(self, key, value):
+        if 'model' not in self.config:
+            self.config['model'] = {}
+        self.config['model'][key] = value
+        self.save_config()
+        self.configChanged.emit()
+
+    def _set_provider_config(self, provider, key, value):
+        if 'model' not in self.config:
+            self.config['model'] = {}
+        if provider not in self.config['model']:
+            self.config['model'][provider] = {}
+        self.config['model'][provider][key] = value
         self.save_config()
         self.configChanged.emit()

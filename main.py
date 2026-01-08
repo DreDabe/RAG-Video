@@ -10,6 +10,7 @@ from conversation_manager import ConversationManager
 from config_manager import ConfigManager
 from markdown_formatter import MarkdownFormatter
 from knowledge_updater import KnowledgeUpdater
+from dify_client import DifyClient
 
 
 class ChatController(QObject):
@@ -19,12 +20,14 @@ class ChatController(QObject):
     loadingStateChanged = Signal(bool)
     messageAdded = Signal()
 
-    def __init__(self, conversation_manager=None):
+    def __init__(self, conversation_manager=None, config_manager=None):
         super().__init__()
         self.conversation_manager = conversation_manager or ConversationManager()
+        self.config_manager = config_manager
         self.markdown_formatter = MarkdownFormatter()
         self.is_generating = False
         self.should_stop = False
+        self.dify_conversation_id = None
 
     @Slot(str, result=str)
     def format_markdown(self, text):
@@ -53,19 +56,36 @@ class ChatController(QObject):
         
         def generate_response():
             try:
-                time.sleep(0.5)
+                if self.should_stop:
+                    return
+                
+                if not self.config_manager:
+                    raise Exception("ConfigManager未初始化")
+                
+                api_key = self.config_manager.get_app_api()
+                if not api_key:
+                    raise Exception("Dify API Key未配置")
+                
+                dify_client = DifyClient(api_key)
+                
+                user_id = "digital-garden-user"
+                response = dify_client.send_message(
+                    query=text,
+                    user=user_id,
+                    conversation_id=self.dify_conversation_id,
+                    response_mode="blocking"
+                )
                 
                 if self.should_stop:
                     return
                 
-                self.messageReceived.emit("1")
+                answer = dify_client.get_answer(response)
+                self.dify_conversation_id = dify_client.get_conversation_id(response)
                 
-                time.sleep(0.3)
+                print(f"Dify response: {answer}")
                 
-                if self.should_stop:
-                    return
-                
-                self.conversation_manager.add_message(conversation_id, "assistant", "1")
+                self.messageReceived.emit(answer)
+                self.conversation_manager.add_message(conversation_id, "assistant", answer)
                 self.messageAdded.emit()
                 
                 self.is_generating = False
@@ -73,6 +93,10 @@ class ChatController(QObject):
                 self.loadingStateChanged.emit(False)
             except Exception as e:
                 print(f"Error in generate_response: {e}")
+                error_message = f"抱歉，发生了错误：{str(e)}"
+                self.messageReceived.emit(error_message)
+                self.conversation_manager.add_message(conversation_id, "assistant", error_message)
+                self.messageAdded.emit()
                 self.is_generating = False
                 self.generationStopped.emit()
                 self.loadingStateChanged.emit(False)
