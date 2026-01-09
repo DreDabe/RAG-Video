@@ -2,4 +2,4 @@
 name = "digital-garden-chat"
 
 [tool.pyside6-project]
-files = ["main.py", "main.qml"]
+files = ["config_manager.py", "conversation_manager.py", "knowledge_updater.py", "main.py", "main.qml", "markdown_formatter.py"]
