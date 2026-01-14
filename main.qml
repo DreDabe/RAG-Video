@@ -19,6 +19,7 @@ ApplicationWindow {
     property bool settingsVisible: false
     property string activeView: "chat"
     property string conversationToDelete: ""
+    property bool isRefreshingModelList: false
 
     function loadConversations() {
         console.log("Loading conversations...")
@@ -52,6 +53,19 @@ ApplicationWindow {
         }
         chatList.positionViewAtEnd()
         console.log("=== loadMessages finished ===")
+    }
+
+    function refreshModelList() {
+        if (!mainModelProviderCombo || isRefreshingModelList) return;
+        isRefreshingModelList = true;
+        var models = configManager.get_models_by_provider(mainModelProviderCombo.currentText)
+        if (systemModelCombo) {
+            systemModelCombo.model = models
+        }
+        console.log("Refreshed model list for provider:", mainModelProviderCombo.currentText, "Models:", models)
+        Qt.callLater(function() {
+            isRefreshingModelList = false;
+        })
     }
 
     // 动画配置
@@ -336,15 +350,11 @@ ApplicationWindow {
                         loadMessages()
                     } else {
                         console.log("Switching to empty title conversation...")
-                        for (var i = 0; i < conversationModel.count; i++) {
-                            var conv = conversationModel.get(i)
-                            if (!conv.title || conv.title.trim() === "") {
-                                console.log("Found empty title conversation, ID:", conv.id)
-                                conversationManager.load_conversation(conv.id)
-                                loadMessages()
-                                break
-                            }
-                        }
+                        var emptyConvId = conversationManager.get_empty_title_conversation_id()
+                        console.log("Found empty title conversation, ID:", emptyConvId)
+                        conversationManager.load_conversation(emptyConvId)
+                        window.activeView = "chat"
+                        loadMessages()
                     }
                     console.log("=== New conversation button click finished ===")
                 }
@@ -388,7 +398,7 @@ ApplicationWindow {
                     }
                     
                     background: Rectangle {
-                        color: (listDel.hovered || String(model.id) === String(conversationManager.current_conversation_id)) ? "#1d1d20" : "transparent"
+                        color: (listDel.hovered || (window.activeView === "chat" && String(model.id) === String(conversationManager.current_conversation_id))) ? "#1d1d20" : "transparent"
                         radius: 8
                     }
                     
@@ -404,7 +414,7 @@ ApplicationWindow {
                             Text {
                                 anchors.centerIn: parent
                                 text: "•"
-                                color: (listDel.hovered || (conversationManager.current_conversation_id !== null && String(model.id) === String(conversationManager.current_conversation_id))) ? "white" : "#3f3f46"
+                                color: (listDel.hovered || (window.activeView === "chat" && conversationManager.current_conversation_id !== null && String(model.id) === String(conversationManager.current_conversation_id))) ? "white" : "#3f3f46"
                                 font.pixelSize: 20
                                 visible: sidebarExpanded
                             }
@@ -420,7 +430,7 @@ ApplicationWindow {
                                 id: titleText
                                 anchors.fill: parent
                                 text: model.title
-                                color: (listDel.hovered || (conversationManager.current_conversation_id !== null && String(model.id) === String(conversationManager.current_conversation_id))) ? "white" : "#a1a1aa"
+                                color: (listDel.hovered || (window.activeView === "chat" && conversationManager.current_conversation_id !== null && String(model.id) === String(conversationManager.current_conversation_id))) ? "white" : "#a1a1aa"
                                 font.pixelSize: 13
                                 elide: Text.ElideRight
                                 verticalAlignment: Text.AlignVCenter
@@ -960,32 +970,30 @@ ApplicationWindow {
                     datasetIdField.fieldText = configManager.get_dataset_id()
                     appUrlField.fieldText = configManager.get_app_url()
                     appApiField.fieldText = configManager.get_app_api()
-                    languageCombo.currentIndex = languageCombo.find(configManager.get_language())
+                    languageCombo.currentIndex = languageCombo.find(configManager.get_language(), Qt.MatchExactly)
                     
                     // 初始化模型配置
                     var provider = configManager.get_model_provider()
                     console.log("Loading model provider:", provider)
-                    for (var i = 0; i < modelProviderCombo.count; i++) {
-                        if (modelProviderCombo.textAt(i) === provider) {
-                            modelProviderCombo.currentIndex = i
+                    for (var i = 0; i < mainModelProviderCombo.count; i++) {
+                        if (mainModelProviderCombo.textAt(i) === provider) {
+                            mainModelProviderCombo.currentIndex = i
                             break
                         }
                     }
-                    ollamaBaseUrlField.fieldText = configManager.get_ollama_base_url()
-                    ollamaModelNameField.fieldText = configManager.get_ollama_model_name()
-                    ollamaApiKeyField.fieldText = configManager.get_ollama_api_key()
-                    openaiBaseUrlField.fieldText = configManager.get_openai_base_url()
-                    openaiModelNameField.fieldText = configManager.get_openai_model_name()
-                    openaiApiKeyField.fieldText = configManager.get_openai_api_key()
-                    anthropicBaseUrlField.fieldText = configManager.get_anthropic_base_url()
-                    anthropicModelNameField.fieldText = configManager.get_anthropic_model_name()
-                    anthropicApiKeyField.fieldText = configManager.get_anthropic_api_key()
-                    qwenBaseUrlField.fieldText = configManager.get_qwen_base_url()
-                    qwenModelNameField.fieldText = configManager.get_qwen_model_name()
-                    qwenApiKeyField.fieldText = configManager.get_qwen_api_key()
-                    deepseekBaseUrlField.fieldText = configManager.get_deepseek_base_url()
-                    deepseekModelNameField.fieldText = configManager.get_deepseek_model_name()
-                    deepseekApiKeyField.fieldText = configManager.get_deepseek_api_key()
+                    refreshModelList()
+                    
+                    // 设置当前激活的模型
+                    var activeModel = configManager.get_active_model()
+                    console.log("Loading active model:", activeModel)
+                    if (activeModel && systemModelCombo) {
+                        for (var j = 0; j < systemModelCombo.count; j++) {
+                            if (systemModelCombo.textAt(j) === activeModel) {
+                                systemModelCombo.currentIndex = j
+                                break
+                            }
+                        }
+                    }
                 })
             }
             
@@ -997,34 +1005,30 @@ ApplicationWindow {
                         datasetIdField.fieldText = configManager.get_dataset_id()
                         appUrlField.fieldText = configManager.get_app_url()
                         appApiField.fieldText = configManager.get_app_api()
-                        languageCombo.currentIndex = languageCombo.find(configManager.get_language())
+                        languageCombo.currentIndex = languageCombo.find(configManager.get_language(), Qt.MatchExactly)
                         
                         // 更新模型配置
-                        Qt.callLater(function() {
-                            var provider = configManager.get_model_provider()
-                            console.log("Config changed, updating model provider:", provider)
-                            for (var i = 0; i < modelProviderCombo.count; i++) {
-                                if (modelProviderCombo.textAt(i) === provider) {
-                                    modelProviderCombo.currentIndex = i
+                        var provider = configManager.get_model_provider()
+                        console.log("Config changed, updating model provider:", provider)
+                        for (var i = 0; i < mainModelProviderCombo.count; i++) {
+                            if (mainModelProviderCombo.textAt(i) === provider) {
+                                mainModelProviderCombo.currentIndex = i
+                                break
+                            }
+                        }
+                        refreshModelList()
+                        
+                        // 设置当前激活的模型
+                        var activeModel = configManager.get_active_model()
+                        console.log("Config changed, loading active model:", activeModel)
+                        if (activeModel && systemModelCombo) {
+                            for (var j = 0; j < systemModelCombo.count; j++) {
+                                if (systemModelCombo.textAt(j) === activeModel) {
+                                    systemModelCombo.currentIndex = j
                                     break
                                 }
                             }
-                            ollamaBaseUrlField.fieldText = configManager.get_ollama_base_url()
-                            ollamaModelNameField.fieldText = configManager.get_ollama_model_name()
-                            ollamaApiKeyField.fieldText = configManager.get_ollama_api_key()
-                            openaiBaseUrlField.fieldText = configManager.get_openai_base_url()
-                            openaiModelNameField.fieldText = configManager.get_openai_model_name()
-                            openaiApiKeyField.fieldText = configManager.get_openai_api_key()
-                            anthropicBaseUrlField.fieldText = configManager.get_anthropic_base_url()
-                            anthropicModelNameField.fieldText = configManager.get_anthropic_model_name()
-                            anthropicApiKeyField.fieldText = configManager.get_anthropic_api_key()
-                            qwenBaseUrlField.fieldText = configManager.get_qwen_base_url()
-                            qwenModelNameField.fieldText = configManager.get_qwen_model_name()
-                            qwenApiKeyField.fieldText = configManager.get_qwen_api_key()
-                            deepseekBaseUrlField.fieldText = configManager.get_deepseek_base_url()
-                            deepseekModelNameField.fieldText = configManager.get_deepseek_model_name()
-                            deepseekApiKeyField.fieldText = configManager.get_deepseek_api_key()
-                        })
+                        }
                     })
                 }
             }
@@ -1129,168 +1133,88 @@ ApplicationWindow {
 
                         Text { text: "模型配置"; color: "#3b82f6"; font.pixelSize: 14; Layout.topMargin: 20 }
                         
-                        // 模型供应商选择
+                        // 配置入口按钮行
                         RowLayout {
+                            Layout.fillWidth: true
+                            Text { 
+                                text: "管理详细参数"; 
+                                color: "#a1a1aa"; 
+                                font.pixelSize: 13; 
+                                Layout.fillWidth: true 
+                            }
+                            Button {
+                                id: openPopupBtn
+                                Layout.preferredWidth: 100
+                                Layout.preferredHeight: 32
+                                contentItem: Text {
+                                    text: "添加配置"
+                                    color: "white"
+                                    font.pixelSize: 12
+                                    horizontalAlignment: Text.AlignHCenter
+                                }
+                                background: Rectangle {
+                                    color: openPopupBtn.hovered ? "#3f3f46" : "#27272a"
+                                    radius: 6
+                                    border.color: "#3f3f46"
+                                }
+                                onClicked: modelConfigPopup.open()
+                            }
+                        }
+
+                        // 1. 选择模型供应商
+                        RowLayout {
+                            Layout.fillWidth: true
                             Text { text: "模型供应商"; color: "#a1a1aa"; Layout.fillWidth: true }
                             ComboBox { 
-                                id: modelProviderCombo
+                                id: mainModelProviderCombo
                                 model: ["ollama", "openai", "anthropic", "qwen", "deepseek"]
-                                Layout.preferredWidth: 150
+                                Layout.preferredWidth: 200
                                 onActivated: {
                                     configManager.set_model_provider(currentText)
+                                    refreshModelList()
+                                    
+                                    // 切换供应商时，选择第一个可用模型
+                                    Qt.callLater(function() {
+                                        if (systemModelCombo && systemModelCombo.count > 0) {
+                                            systemModelCombo.currentIndex = 0
+                                            configManager.set_active_model(systemModelCombo.textAt(0))
+                                            console.log("Switched provider, selected first model:", systemModelCombo.textAt(0))
+                                        }
+                                    })
                                 }
                                 delegate: ItemDelegate {
-                                    width: modelProviderCombo.width
+                                    width: mainModelProviderCombo.width
                                     contentItem: Text { text: modelData; color: "white"; verticalAlignment: Text.AlignVCenter }
                                     background: Rectangle { color: hovered ? "#27272a" : "#18181b" }
                                 }
-                                contentItem: Text { text: modelProviderCombo.displayText; color: "white"; leftPadding: 12; verticalAlignment: Text.AlignVCenter }
+                                contentItem: Text { text: mainModelProviderCombo.displayText; color: "white"; leftPadding: 12; verticalAlignment: Text.AlignVCenter }
                                 background: Rectangle { color: "#09090b"; radius: 8; border.color: "#27272a" }
                             }
                         }
-                        
-                        // Ollama 配置
-                        ColumnLayout {
+
+                        // 2. 选择具体的系统模型 (由配置好的模型填充)
+                        RowLayout {
                             Layout.fillWidth: true
-                            spacing: 8
-                            visible: modelProviderCombo.currentText === "ollama"
-                            
-                            SettingInput { 
-                                label: "Ollama Base URL"; 
-                                configKey: "ollama_base_url"
-                                configType: "model"
-                                id: ollamaBaseUrlField
-                                onSettingTextChanged: function(text) { configManager.set_ollama_base_url(text) }
-                            }
-                            SettingInput { 
-                                label: "Ollama Model Name"; 
-                                configKey: "ollama_model_name"
-                                configType: "model"
-                                id: ollamaModelNameField
-                                onSettingTextChanged: function(text) { configManager.set_ollama_model_name(text) }
-                            }
-                            SettingInput { 
-                                label: "Ollama API Key (可选)"; 
-                                configKey: "ollama_api_key"
-                                configType: "model"
-                                id: ollamaApiKeyField
-                                onSettingTextChanged: function(text) { configManager.set_ollama_api_key(text) }
-                            }
-                        }
-                        
-                        // OpenAI 配置
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            spacing: 8
-                            visible: modelProviderCombo.currentText === "openai"
-                            
-                            SettingInput { 
-                                label: "OpenAI Base URL"; 
-                                configKey: "openai_base_url"
-                                configType: "model"
-                                id: openaiBaseUrlField
-                                onSettingTextChanged: function(text) { configManager.set_openai_base_url(text) }
-                            }
-                            SettingInput { 
-                                label: "OpenAI Model Name"; 
-                                configKey: "openai_model_name"
-                                configType: "model"
-                                id: openaiModelNameField
-                                onSettingTextChanged: function(text) { configManager.set_openai_model_name(text) }
-                            }
-                            SettingInput { 
-                                label: "OpenAI API Key"; 
-                                configKey: "openai_api_key"
-                                configType: "model"
-                                id: openaiApiKeyField
-                                onSettingTextChanged: function(text) { configManager.set_openai_api_key(text) }
-                            }
-                        }
-                        
-                        // Anthropic 配置
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            spacing: 8
-                            visible: modelProviderCombo.currentText === "anthropic"
-                            
-                            SettingInput { 
-                                label: "Anthropic Base URL"; 
-                                configKey: "anthropic_base_url"
-                                configType: "model"
-                                id: anthropicBaseUrlField
-                                onSettingTextChanged: function(text) { configManager.set_anthropic_base_url(text) }
-                            }
-                            SettingInput { 
-                                label: "Anthropic Model Name"; 
-                                configKey: "anthropic_model_name"
-                                configType: "model"
-                                id: anthropicModelNameField
-                                onSettingTextChanged: function(text) { configManager.set_anthropic_model_name(text) }
-                            }
-                            SettingInput { 
-                                label: "Anthropic API Key"; 
-                                configKey: "anthropic_api_key"
-                                configType: "model"
-                                id: anthropicApiKeyField
-                                onSettingTextChanged: function(text) { configManager.set_anthropic_api_key(text) }
-                            }
-                        }
-                        
-                        // 通义千问配置
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            spacing: 8
-                            visible: modelProviderCombo.currentText === "qwen"
-                            
-                            SettingInput { 
-                                label: "Qwen Base URL"; 
-                                configKey: "qwen_base_url"
-                                configType: "model"
-                                id: qwenBaseUrlField
-                                onSettingTextChanged: function(text) { configManager.set_qwen_base_url(text) }
-                            }
-                            SettingInput { 
-                                label: "Qwen Model Name"; 
-                                configKey: "qwen_model_name"
-                                configType: "model"
-                                id: qwenModelNameField
-                                onSettingTextChanged: function(text) { configManager.set_qwen_model_name(text) }
-                            }
-                            SettingInput { 
-                                label: "Qwen API Key"; 
-                                configKey: "qwen_api_key"
-                                configType: "model"
-                                id: qwenApiKeyField
-                                onSettingTextChanged: function(text) { configManager.set_qwen_api_key(text) }
-                            }
-                        }
-                        
-                        // 深度求索配置
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            spacing: 8
-                            visible: modelProviderCombo.currentText === "deepseek"
-                            
-                            SettingInput { 
-                                label: "DeepSeek Base URL"; 
-                                configKey: "deepseek_base_url"
-                                configType: "model"
-                                id: deepseekBaseUrlField
-                                onSettingTextChanged: function(text) { configManager.set_deepseek_base_url(text) }
-                            }
-                            SettingInput { 
-                                label: "DeepSeek Model Name"; 
-                                configKey: "deepseek_model_name"
-                                configType: "model"
-                                id: deepseekModelNameField
-                                onSettingTextChanged: function(text) { configManager.set_deepseek_model_name(text) }
-                            }
-                            SettingInput { 
-                                label: "DeepSeek API Key"; 
-                                configKey: "deepseek_api_key"
-                                configType: "model"
-                                id: deepseekApiKeyField
-                                onSettingTextChanged: function(text) { configManager.set_deepseek_api_key(text) }
+                            Text { text: "当前系统模型"; color: "#a1a1aa"; Layout.fillWidth: true }
+                            ComboBox { 
+                                id: systemModelCombo
+                                model: {
+                                    var models = configManager.get_models_by_provider(mainModelProviderCombo.currentText)
+                                    models.length > 0 ? models : ["无"]
+                                }
+                                Layout.preferredWidth: 200
+                                onActivated: {
+                                    if (currentText !== "无") {
+                                        configManager.set_active_model(currentText)
+                                    }
+                                }
+                                delegate: ItemDelegate {
+                                    width: systemModelCombo.width
+                                    contentItem: Text { text: modelData; color: "white"; verticalAlignment: Text.AlignVCenter }
+                                    background: Rectangle { color: hovered ? "#27272a" : "#18181b" }
+                                }
+                                contentItem: Text { text: systemModelCombo.displayText; color: "white"; leftPadding: 12; verticalAlignment: Text.AlignVCenter }
+                                background: Rectangle { color: "#09090b"; radius: 8; border.color: "#27272a" }
                             }
                         }
                     }
@@ -1500,6 +1424,111 @@ ApplicationWindow {
                             // 清除旧日志开始新任务
                             logArea.text = "> 任务启动中..."
                             knowledgeUpdater.start_update()
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- 模型配置弹窗 ---
+        Popup {
+            id: modelConfigPopup
+            anchors.centerIn: parent
+            width: 450
+            height: 480
+            modal: true
+            focus: true
+            closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+            
+            background: Rectangle {
+                color: "#18181b"
+                border.color: "#27272a"
+                radius: 12
+            }
+
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 24
+                spacing: 16
+
+                Text {
+                    text: "添加/编辑模型配置"
+                    color: "white"
+                    font.pixelSize: 18
+                    font.weight: Font.Bold
+                    Layout.bottomMargin: 8
+                }
+
+                component PopupInput : ColumnLayout {
+                    property string label: ""
+                    property alias text: field.text
+                    property string placeholder: ""
+                    spacing: 8
+                    Layout.fillWidth: true
+                    Text { text: label; color: "#a1a1aa"; font.pixelSize: 12 }
+                    TextField {
+                        id: field
+                        Layout.fillWidth: true
+                        placeholderText: placeholder
+                        color: "white"
+                        background: Rectangle {
+                            color: "#09090b"
+                            radius: 8
+                            border.color: parent.activeFocus ? "#3b82f6" : "#27272a"
+                        }
+                    }
+                }
+
+                PopupInput { id: newModelName; label: "模型名称 (必填)"; placeholder: "例如: 我的GPT-4" }
+                
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+                    Text { text: "模型供应商"; color: "#a1a1aa"; font.pixelSize: 12 }
+                    ComboBox {
+                        id: newModelProvider
+                        Layout.fillWidth: true
+                        model: ["ollama", "openai", "anthropic", "qwen", "deepseek"]
+                        delegate: ItemDelegate {
+                            width: newModelProvider.width
+                            contentItem: Text { text: modelData; color: "white"; verticalAlignment: Text.AlignVCenter }
+                            background: Rectangle { color: hovered ? "#27272a" : "#18181b" }
+                        }
+                        contentItem: Text { text: newModelProvider.displayText; color: "white"; leftPadding: 12; verticalAlignment: Text.AlignVCenter }
+                        background: Rectangle { color: "#09090b"; radius: 8; border.color: "#27272a" }
+                    }
+                }
+
+                PopupInput { id: newModelUrl; label: "Base URL"; placeholder: "http://..." }
+                PopupInput { id: newModelKey; label: "API Key"; placeholder: "sk-..." }
+
+                Item { Layout.fillHeight: true }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 12
+                    Button {
+                        id: cancelModelBtn
+                        Layout.fillWidth: true
+                        text: "取消"
+                        onClicked: modelConfigPopup.close()
+                        contentItem: Text { text: "取消"; color: "white"; horizontalAlignment: Text.AlignHCenter }
+                        background: Rectangle { color: cancelModelBtn.hovered ? "#3f3f46" : "#27272a"; radius: 8 }
+                    }
+                    Button {
+                        id: saveModelBtn
+                        Layout.fillWidth: true
+                        contentItem: Text { text: "保存配置"; color: "black"; horizontalAlignment: Text.AlignHCenter; font.weight: Font.Bold }
+                        background: Rectangle { color: "white"; radius: 8 }
+                        onClicked: {
+                            if (newModelName.text.trim() === "") return;
+                            configManager.save_custom_model(
+                                newModelName.text, 
+                                newModelProvider.currentText, 
+                                newModelUrl.text, 
+                                newModelKey.text
+                            )
+                            modelConfigPopup.close()
                         }
                     }
                 }

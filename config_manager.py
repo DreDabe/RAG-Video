@@ -33,31 +33,14 @@ class ConfigManager(QObject):
             },
             'model': {
                 'provider': 'ollama',
-                'ollama': {
-                    'base_url': 'http://localhost:11434/api',
-                    'model_name': 'deepseek-r1:8b',
-                    'api_key': ''
+                'custom_models': {
+                    'ollama': [],
+                    'openai': [],
+                    'anthropic': [],
+                    'qwen': [],
+                    'deepseek': []
                 },
-                'openai': {
-                    'base_url': 'https://api.openai.com/v1',
-                    'model_name': 'gpt-3.5-turbo',
-                    'api_key': ''
-                },
-                'anthropic': {
-                    'base_url': 'https://api.anthropic.com/v1',
-                    'model_name': 'claude-3-sonnet-20240229',
-                    'api_key': ''
-                },
-                'qwen': {
-                    'base_url': 'https://dashscope.aliyuncs.com/api/v1',
-                    'model_name': 'qwen2.5-7b-instruct',
-                    'api_key': 'sk-2ce1bb163bde443bbd959da078b33f3d'
-                },
-                'deepseek': {
-                    'base_url': 'https://api.deepseek.com/v1',
-                    'model_name': 'deepseek-chat',
-                    'api_key': ''
-                }
+                'active_model': ''
             }
         }
         
@@ -213,7 +196,7 @@ class ConfigManager(QObject):
         self.save_config()
         self.configChanged.emit()
 
-    @Slot(str)
+    @Slot(result=str)
     def get_model_provider(self):
         return self.config.get('model', {}).get('provider', 'ollama')
 
@@ -356,3 +339,41 @@ class ConfigManager(QObject):
         self.config['model'][provider][key] = value
         self.save_config()
         self.configChanged.emit()
+
+    @Slot(str, str, str, str)
+    def save_custom_model(self, name, provider, url, api_key):
+        if 'model' not in self.config:
+            self.config['model'] = {}
+        if 'custom_models' not in self.config['model']:
+            self.config['model']['custom_models'] = {}
+        if provider not in self.config['model']['custom_models']:
+            self.config['model']['custom_models'][provider] = []
+        
+        model_config = {
+            'name': name,
+            'url': url,
+            'api_key': api_key
+        }
+        
+        self.config['model']['custom_models'][provider].append(model_config)
+        self.save_config()
+        self.configChanged.emit()
+        print(f"Saved custom model: {name} for provider: {provider}")
+
+    @Slot(str, result=list)
+    def get_models_by_provider(self, provider):
+        custom_models = self.config.get('model', {}).get('custom_models', {}).get(provider, [])
+        return [model['name'] for model in custom_models]
+
+    @Slot(str)
+    def set_active_model(self, model_name):
+        if 'model' not in self.config:
+            self.config['model'] = {}
+        self.config['model']['active_model'] = model_name
+        self.save_config()
+        self.configChanged.emit()
+        print(f"Set active model: {model_name}")
+
+    @Slot(result=str)
+    def get_active_model(self):
+        return self.config.get('model', {}).get('active_model', '')

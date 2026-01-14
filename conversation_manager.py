@@ -216,6 +216,7 @@ class ConversationManager(QObject):
                 'updated_at': c['updated_at']
             }
             for c in self.conversations
+            if c.get('title') and c['title'].strip() != ''
         ]
 
     @Slot(result=list)
@@ -235,3 +236,10 @@ class ConversationManager(QObject):
             if not conv.get('title') or conv['title'].strip() == '':
                 return True
         return False
+    
+    @Slot(result=str)
+    def get_empty_title_conversation_id(self):
+        for conv in self.conversations:
+            if not conv.get('title') or conv['title'].strip() == '':
+                return conv['id']
+        return ""
