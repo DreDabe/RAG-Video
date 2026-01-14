@@ -1440,6 +1440,18 @@ ApplicationWindow {
             focus: true
             closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
             
+            property bool validationAttempted: false
+            readonly property bool allFieldsValid: newModelName.text.trim() !== "" && 
+                                                  newModelUrl.text.trim() !== "" && 
+                                                  newModelKey.text.trim() !== ""
+            
+            onOpened: {
+                validationAttempted = false
+                newModelName.text = ""
+                newModelUrl.text = ""
+                newModelKey.text = ""
+            }
+            
             background: Rectangle {
                 color: "#18181b"
                 border.color: "#27272a"
@@ -1463,18 +1475,26 @@ ApplicationWindow {
                     property string label: ""
                     property alias text: field.text
                     property string placeholder: ""
+                    readonly property bool isEmpty: text.trim() === ""
+                    
                     spacing: 8
                     Layout.fillWidth: true
                     Text { text: label; color: "#a1a1aa"; font.pixelSize: 12 }
                     TextField {
                         id: field
+                        property bool isFieldEmpty: parent.isEmpty
                         Layout.fillWidth: true
                         placeholderText: placeholder
                         color: "white"
                         background: Rectangle {
                             color: "#09090b"
                             radius: 8
-                            border.color: parent.activeFocus ? "#3b82f6" : "#27272a"
+                            border.color: (field.isFieldEmpty && modelConfigPopup.validationAttempted) 
+                                          ? "#ef4444" 
+                                          : (field.activeFocus ? "#3b82f6" : "#27272a")
+                            border.width: (field.isFieldEmpty && modelConfigPopup.validationAttempted) || field.activeFocus ? 2 : 1
+                            
+                            Behavior on border.color { ColorAnimation { duration: 150 } }
                         }
                     }
                 }
@@ -1502,6 +1522,15 @@ ApplicationWindow {
                 PopupInput { id: newModelUrl; label: "Base URL"; placeholder: "http://..." }
                 PopupInput { id: newModelKey; label: "API Key"; placeholder: "sk-..." }
 
+                Text {
+                    id: errorHint
+                    text: "请填写上方所有标红的必填项"
+                    color: "#ef4444"
+                    font.pixelSize: 12
+                    Layout.alignment: Qt.AlignHCenter
+                    visible: modelConfigPopup.validationAttempted && !modelConfigPopup.allFieldsValid
+                }
+
                 Item { Layout.fillHeight: true }
 
                 RowLayout {
@@ -1510,25 +1539,51 @@ ApplicationWindow {
                     Button {
                         id: cancelModelBtn
                         Layout.fillWidth: true
+                        Layout.preferredHeight: 40
                         text: "取消"
                         onClicked: modelConfigPopup.close()
-                        contentItem: Text { text: "取消"; color: "white"; horizontalAlignment: Text.AlignHCenter }
+                        contentItem: Text { 
+                            text: "取消"
+                            color: "white"
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                            }
                         background: Rectangle { color: cancelModelBtn.hovered ? "#3f3f46" : "#27272a"; radius: 8 }
                     }
                     Button {
                         id: saveModelBtn
                         Layout.fillWidth: true
-                        contentItem: Text { text: "保存配置"; color: "black"; horizontalAlignment: Text.AlignHCenter; font.weight: Font.Bold }
-                        background: Rectangle { color: "white"; radius: 8 }
+                        Layout.preferredHeight: 40
+                        
+                        contentItem: Text {
+                            text: "保存配置"
+                            color: "black"
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                            font.weight: Font.Bold
+                        }
+                        
+                        background: Rectangle {
+                            color: "white"
+                            radius: 8
+                            opacity: parent.down ? 0.8 : 1.0
+                        }
+
                         onClicked: {
-                            if (newModelName.text.trim() === "") return;
-                            configManager.save_custom_model(
-                                newModelName.text, 
-                                newModelProvider.currentText, 
-                                newModelUrl.text, 
-                                newModelKey.text
-                            )
-                            modelConfigPopup.close()
+                            modelConfigPopup.validationAttempted = true
+                            
+                            if (modelConfigPopup.allFieldsValid) {
+                                console.log("Validation passed, saving...")
+                                configManager.save_custom_model(
+                                    newModelName.text.trim(), 
+                                    newModelProvider.currentText, 
+                                    newModelUrl.text.trim(), 
+                                    newModelKey.text.trim()
+                                )
+                                modelConfigPopup.close()
+                            } else {
+                                console.log("Validation failed")
+                            }
                         }
                     }
                 }

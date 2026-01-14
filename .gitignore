@@ -90,6 +90,10 @@ utils/whisper/models--*/
 # Data files
 data/
 
+# Doc files (keep only README.md)
+doc/**/*.md
+!doc/README.md
+
 # IDE and editor files
 .vscode/
 .idea/
