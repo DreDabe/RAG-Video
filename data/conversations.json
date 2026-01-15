@@ -1,6 +1,13 @@
 {
   "conversations": [
     {
+      "id": "245f5874-e9b3-451a-8b59-93dbbbfdd2d6",
+      "title": "",
+      "messages": [],
+      "created_at": "2026-01-14T16:53:05.155686",
+      "updated_at": "2026-01-14T16:53:05.155709"
+    },
+    {
       "id": "abb45616-1134-4e34-9270-3334fa92c094",
       "title": "请为我查找以下科普内容",
       "messages": [
@@ -57,5 +64,5 @@
       "updated_at": "2026-01-09T02:41:24.524113"
     }
   ],
-  "current_conversation_id": "abb45616-1134-4e34-9270-3334fa92c094"
+  "current_conversation_id": "245f5874-e9b3-451a-8b59-93dbbbfdd2d6"
 }

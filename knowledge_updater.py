@@ -8,6 +8,7 @@ import yt_dlp
 from faster_whisper import WhisperModel
 from config.platform_config import get_platform_config, is_type_supported
 from config.model_config import get_model_config
+from cookie_parser import detect_cookie_format, normalize_cookie, get_cookie_format_name
 
 
 class BasePlatformHandler:
@@ -45,7 +46,7 @@ class BilibiliPlaylistHandler(BasePlatformHandler):
         }
         
         if cookie_text:
-            self._save_cookie(cookie_text)
+            self._save_cookie(cookie_text, url)
         
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -91,7 +92,6 @@ class BilibiliPlaylistHandler(BasePlatformHandler):
             
             dl_opts = {
                 'cookiefile': str(self.cookies_file) if cookie_text else None,
-                'download_archive': str(self.archive_file),
                 'format': 'worstvideo[height<=360]+bestaudio/worst',
                 'outtmpl': f'{self.temp_dir}/{video_id}.%(ext)s',
                 'write_auto_subs': True,
@@ -101,6 +101,11 @@ class BilibiliPlaylistHandler(BasePlatformHandler):
             
             with yt_dlp.YoutubeDL(dl_opts) as ydl_dl:
                 info_dict = ydl_dl.extract_info(video_url, download=True)
+                
+                if not info_dict:
+                    self._log(f"[-] 无法获取视频信息，URL: {video_url}")
+                    return
+                
                 v_title = info_dict.get('title', f"Video_{video_id}")
             
             self._log(f"[√] 成功获取标题: {v_title}")
@@ -192,9 +197,41 @@ class BilibiliPlaylistHandler(BasePlatformHandler):
                 '-c:a', 'libmp3lame', '-y', str(audio_path)
             ], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
             
+            if self.should_stop:
+                self._log("[!] 任务已停止（Whisper调用前）")
+                return ""
+            
             if self.whisper_model:
-                segments, _ = self.whisper_model.transcribe(str(audio_path), beam_size=5)
-                text = " ".join([s.text for s in segments])
+                import threading
+                
+                segments_result = []
+                transcribe_complete = threading.Event()
+                
+                def transcribe_worker():
+                    try:
+                        segments, _ = self.whisper_model.transcribe(str(audio_path), beam_size=5)
+                        segments_result.extend(segments)
+                    except Exception as e:
+                        self._log(f"[-] Whisper transcribe 异常: {e}")
+                    finally:
+                        transcribe_complete.set()
+                
+                thread = threading.Thread(target=transcribe_worker)
+                thread.daemon = True
+                thread.start()
+                
+                while thread.is_alive():
+                    if self.should_stop:
+                        self._log("[!] 任务已停止（Whisper执行中）")
+                        break
+                    thread.join(timeout=0.5)
+                
+                if self.should_stop:
+                    transcribe_complete.set()
+                    return ""
+                
+                transcribe_complete.wait()
+                text = " ".join([s.text for s in segments_result])
             else:
                 text = ""
             
@@ -208,6 +245,10 @@ class BilibiliPlaylistHandler(BasePlatformHandler):
     
     def _extract_keyframes(self, video_path, output_dir):
         """提取关键帧"""
+        if self.should_stop:
+            self._log("[!] 任务已停止（提取关键帧前）")
+            return []
+        
         output_dir.mkdir(exist_ok=True)
         self._log("[*] 提取关键帧图片...")
         
@@ -352,12 +393,52 @@ URL：{url}
         except Exception:
             return False
     
-    def _save_cookie(self, cookie_text):
-        """保存Cookie到文件"""
+    def _save_cookie(self, cookie_text, url=None):
+        """保存Cookie到文件，支持多种格式自动识别和转换"""
+        if not cookie_text or not cookie_text.strip():
+            self._log("[-] Cookie 为空，跳过保存")
+            return
+        
         try:
+            # 检测Cookie格式
+            format_type = detect_cookie_format(cookie_text)
+            format_name = get_cookie_format_name(format_type)
+            self._log(f"[*] 检测到 Cookie 格式: {format_name}")
+            
+            # 从URL中提取域名（用于Header String格式）
+            target_domain = None
+            if url:
+                try:
+                    from urllib.parse import urlparse
+                    parsed = urlparse(url)
+                    if parsed.netloc:
+                        # 提取主域名（添加点号前缀）
+                        # 例如：www.bilibili.com -> .bilibili.com
+                        # bilibili.com -> .bilibili.com
+                        # 这样符合开闭原则，扩展新平台时无需修改代码
+                        domain_parts = parsed.netloc.split('.')
+                        if len(domain_parts) >= 2:
+                            # 提取最后两部分作为主域名，并添加点号前缀
+                            target_domain = f".{'.'.join(domain_parts[-2:])}"
+                        else:
+                            # 如果域名格式不正确，直接使用原域名
+                            target_domain = parsed.netloc
+                        self._log(f"[*] 从 URL 提取域名: {target_domain}")
+                except Exception as e:
+                    self._log(f"[-] 提取域名失败: {e}")
+            
+            # 转换为NetScape格式
+            netscape_cookie = normalize_cookie(cookie_text, target_domain=target_domain)
+            
+            if not netscape_cookie:
+                self._log("[-] Cookie 转换失败，请检查输入格式")
+                return
+            
+            # 保存到文件
             with open(self.cookies_file, 'w', encoding='utf-8') as f:
-                f.write(cookie_text)
-            self._log("[√] Cookie 已保存")
+                f.write(netscape_cookie)
+            
+            self._log("[√] Cookie 已保存并转换为 NetScape 格式")
         except Exception as e:
             self._log(f"[-] 保存 Cookie 失败: {e}")
     

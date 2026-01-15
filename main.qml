@@ -1337,7 +1337,7 @@ ApplicationWindow {
                 // 1. Cookie 输入框 (设置为较小的高度，不自动填充剩余高度)
                 ColumnLayout {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 20 // 设置一个固定的舒适高度
+                    Layout.preferredHeight: 20
                     spacing: 8
                     Text { text: "Cookie (用于平台授权)"; color: "#a1a1aa"; font.pixelSize: 12 }
                     ScrollView {
@@ -1346,7 +1346,7 @@ ApplicationWindow {
                         ScrollBar.vertical.policy: ScrollBar.AsNeeded
                         TextArea {
                             id: cookieField
-                            placeholderText: "粘贴视频平台 Cookie 于此..."
+                            placeholderText: "粘贴视频平台 Cookie 于此...\n\n支持以下格式：\n• NetScape格式（推荐）\n• JSON格式\n• Header String格式（如：name1=value1; name2=value2）\n\n系统会自动识别并转换为NetScape格式"
                             color: "white"
                             font.family: "Consolas, Monospace"
                             font.pixelSize: 13
@@ -1499,7 +1499,7 @@ ApplicationWindow {
                     }
                 }
 
-                PopupInput { id: newModelName; label: "模型名称 (必填)"; placeholder: "例如: 我的GPT-4" }
+                PopupInput { id: newModelName; label: "模型名称 (必填)"; placeholder: "deepseek-r1:8b" }
                 
                 ColumnLayout {
                     Layout.fillWidth: true
@@ -1519,12 +1519,12 @@ ApplicationWindow {
                     }
                 }
 
-                PopupInput { id: newModelUrl; label: "Base URL"; placeholder: "http://..." }
-                PopupInput { id: newModelKey; label: "API Key"; placeholder: "sk-..." }
+                PopupInput { id: newModelUrl; label: "Base URL(必填)"; placeholder: "http://..." }
+                PopupInput { id: newModelKey; label: "API Key(必填)"; placeholder: "sk-..." }
 
                 Text {
                     id: errorHint
-                    text: "请填写上方所有标红的必填项"
+                    text: "请填写上方所有必填项"
                     color: "#ef4444"
                     font.pixelSize: 12
                     Layout.alignment: Qt.AlignHCenter
