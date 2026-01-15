@@ -13,12 +13,65 @@ class MarkdownFormatter(QObject):
         
         formatted = text
         
+        # 格式化顺序很重要，先处理复杂的，再处理简单的
         formatted = self._format_code_blocks(formatted)
         formatted = self._format_inline_code(formatted)
         formatted = self._format_bold(formatted)
+        formatted = self._format_italic(formatted)
+        formatted = self._format_headings(formatted)
+        formatted = self._format_lists(formatted)
         formatted = self._format_links(formatted)
+        formatted = self._format_newlines(formatted)
         
         return formatted
+
+    def _format_italic(self, text):
+        pattern = r'\*([^*]+)\*'
+        
+        def replace_italic(match):
+            content = match.group(1)
+            return f'<span style="font-style: italic;">{content}</span>'
+        
+        return re.sub(pattern, replace_italic, text)
+
+    def _format_headings(self, text):
+        # 支持 # 到 ###### 的标题，处理标题前可能的空格
+        for i in range(6, 0, -1):
+            pattern = rf'^\s*{"#" * i} (.*)$'
+            
+            def replace_heading(match):
+                content = match.group(1)
+                font_size = 24 - (i - 1) * 3  # 标题1: 24px, 标题2: 21px, ..., 标题6: 9px
+                return f'<div style="font-size: {font_size}px; font-weight: bold; color: #e4e4e7; margin: 16px 0 8px 0;">{content}</div>'
+            
+            text = re.sub(pattern, replace_heading, text, flags=re.MULTILINE)
+        
+        return text
+
+    def _format_lists(self, text):
+        # 无序列表 - 支持 -, *, + 作为列表标记
+        pattern = r'^\s*[-*+] (.*)$'
+        
+        def replace_unordered_list(match):
+            content = match.group(1)
+            return f'<div style="margin: 4px 0; padding-left: 24px;">• {content}</div>'
+        
+        text = re.sub(pattern, replace_unordered_list, text, flags=re.MULTILINE)
+        
+        # 有序列表 - 支持数字. 格式
+        pattern = r'^\s*\d+\. (.*)$'
+        
+        def replace_ordered_list(match):
+            content = match.group(1)
+            return f'<div style="margin: 4px 0; padding-left: 24px;">{match.group(0).split(" ")[0]} {content}</div>'
+        
+        text = re.sub(pattern, replace_ordered_list, text, flags=re.MULTILINE)
+        
+        return text
+
+    def _format_newlines(self, text):
+        # 替换换行符为<br>标签
+        return text.replace('\n', '<br>')
 
     def _format_code_blocks(self, text):
         pattern = r'```([\s\S]*?)\n([\s\S]*?)```'

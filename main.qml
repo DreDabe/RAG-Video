@@ -814,8 +814,8 @@ ApplicationWindow {
                                     id: messageText
                                     anchors.fill: parent
                                     anchors.margins: 10
-                                    text: role === "assistant" ? chatController.format_markdown(content) : content
-                                    textFormat: role === "assistant" ? Text.RichText : Text.PlainText
+                                    text: role === "assistant" ? content : content
+                                    textFormat: role === "assistant" ? Text.MarkdownText : Text.PlainText
                                     color: "#e4e4e7"
                                     font.pixelSize: 15
                                     wrapMode: Text.WordWrap
@@ -847,8 +847,8 @@ ApplicationWindow {
                         id: streamingResponseText
                         anchors.fill: parent
                         anchors.margins: 10
-                        text: chatController.format_markdown(chatView.streamingResponse)
-                        textFormat: Text.RichText
+                        text: chatView.streamingResponse
+                        textFormat: Text.MarkdownText
                         color: "#e4e4e7"
                         font.pixelSize: 15
                         wrapMode: Text.WordWrap
