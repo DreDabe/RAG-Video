@@ -11,6 +11,9 @@
 - **自动转录**：使用Whisper模型自动提取视频语音内容
 - **AI分析**：通过通义千问对视频内容进行深度分析
 - **Dify集成**：将分析结果同步到Dify知识库，支持智能检索
+- **多模型支持**：集成Ollama、OpenAI、Anthropic、通义千问、DeepSeek等多种AI模型
+- **智能Cookie处理**：自动识别和转换多种Cookie格式，支持Bilibili等平台的登录状态
+- **实时日志系统**：详细的操作日志，方便排查问题
 
 ### 🔧 技术特性
 - **跨平台**：基于Qt的跨平台桌面应用
@@ -18,6 +21,7 @@
 - **智能视频处理**：提取关键帧、语音转文字、内容摘要
 - **配置管理**：支持API密钥、平台设置等配置
 - **错误处理**：完善的错误提示和异常处理
+- **模块化设计**：清晰的代码结构，易于扩展和维护
 
 ## 📋 系统要求
 
@@ -25,6 +29,8 @@
 - **Qt** 6.0+ (PySide6)
 - **ffmpeg**（用于视频处理）
 - **Git**（用于版本控制）
+- **Whisper模型**（用于语音转文字）
+- **AI模型**（可选，用于视频内容分析）
 
 ## 🚀 安装步骤
 
@@ -60,6 +66,14 @@ pip install -r requirements.txt
 
 ### 2. 视频平台配置
 - **Bilibili**：需要登录后获取Cookie（用于访问收藏夹）
+- **Cookie格式**：支持JSON、Header String、NetScape等多种格式
+
+### 3. AI模型配置
+- **Ollama**：本地部署的AI模型
+- **OpenAI**：GPT系列模型
+- **Anthropic**：Claude系列模型
+- **通义千问**：阿里云AI模型
+- **DeepSeek**：深度求索AI模型
 
 ## 📖 使用指南
 
@@ -69,6 +83,7 @@ pip install -r requirements.txt
 2. 在聊天输入框中输入问题
 3. 点击发送按钮或按Enter键
 4. 查看AI的实时回复
+5. 点击停止按钮可中断AI回复
 
 ### 2. 管理对话
 
@@ -85,6 +100,15 @@ pip install -r requirements.txt
 5. 粘贴Cookie（可选，用于访问私有内容）
 6. 点击"开始更新"按钮
 7. 等待处理完成，查看日志输出
+8. 点击"停止"按钮可中断更新过程
+
+### 4. 配置管理
+
+1. 点击设置按钮进入配置界面
+2. 配置Dify API信息
+3. 配置AI模型参数
+4. 配置知识库更新设置
+5. 保存配置并重启应用
 
 ## 🔍 工作原理
 
@@ -104,6 +128,12 @@ pip install -r requirements.txt
 4. **流式响应**：实时显示AI回复
 5. **结果保存**：将AI回复保存到对话历史
 
+### Cookie处理流程
+1. **格式检测**：自动检测Cookie的格式（JSON、Header String、NetScape）
+2. **格式转换**：将不同格式的Cookie转换为NetScape格式
+3. **域名提取**：从URL中自动提取域名，用于Cookie的正确匹配
+4. **文件保存**：将处理后的Cookie保存到文件，供后续使用
+
 ## 📁 项目结构
 
 ```
@@ -114,13 +144,22 @@ pip install -r requirements.txt
 ├── dify_client.py           # Dify API客户端
 ├── config_manager.py        # 配置管理
 ├── markdown_formatter.py    # Markdown格式化
+├── cookie_parser.py         # Cookie解析和转换
+├── logger_config.py         # 日志配置
 ├── requirements.txt         # 依赖库列表
-├── utils/                   # 工具目录
-│   ├── ffmpeg/             # FFmpeg工具
-│   └── whisper/            # Whisper模型
+├── config/                  # 配置目录
+│   ├── __init__.py
+│   ├── model_config.py      # 模型配置
+│   └── platform_config.py   # 平台配置
 ├── data/                    # 数据目录
 │   ├── conversations.json  # 对话记录
-│   └── bili_temp/          # 临时文件
+│   ├── bili_temp/          # 临时文件
+│   └── cookies.txt         # Cookie文件
+├── utils/                   # 工具目录
+│   └── whisper/            # Whisper模型
+├── logs/                    # 日志目录
+│   └── app.log             # 应用日志
+├── img/                     # 图片资源目录
 └── doc/                     # 文档目录
 ```
 
@@ -131,6 +170,10 @@ pip install -r requirements.txt
 - **Whisper**：语音转文字模型
 - **yt-dlp**：视频下载工具
 - **FFmpeg**：音视频处理工具
+- **Ollama**：本地AI模型运行时
+- **OpenAI**：GPT系列模型
+- **Anthropic**：Claude系列模型
+- **DeepSeek**：深度求索AI模型
 
 ## 🤝 贡献指南
 
@@ -156,6 +199,8 @@ pip install -r requirements.txt
 - **yt-dlp**：视频下载工具
 - **通义千问**：AI分析模型
 - **Dify**：知识库管理平台
+- **Ollama**：本地AI模型运行时
+- **FFmpeg**：音视频处理工具
 
 ---
 
