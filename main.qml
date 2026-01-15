@@ -810,17 +810,37 @@ ApplicationWindow {
                                 radius: 12
                                 implicitHeight: messageText.implicitHeight + 20
 
-                                Text {
+                                TextEdit {
                                     id: messageText
                                     anchors.fill: parent
                                     anchors.margins: 10
-                                    text: role === "assistant" ? content : content
-                                    textFormat: role === "assistant" ? Text.MarkdownText : Text.PlainText
+                                    text: {
+                                        if (role === "assistant" && markdownFormatter) {
+                                            var formatted = markdownFormatter.format(content)
+                                            return formatted || content
+                                        }
+                                        return content
+                                    }
+                                    textFormat: role === "assistant" ? TextEdit.RichText : TextEdit.PlainText
                                     color: "#e4e4e7"
                                     font.pixelSize: 15
                                     wrapMode: Text.WordWrap
-                                    lineHeight: 1.4
-                                    verticalAlignment: Text.AlignVCenter
+                                    selectByMouse: true
+                                    readOnly: true
+                                    onLinkActivated: function(link) {
+                                        console.log("=== Link clicked ===")
+                                        console.log("Link URL:", link)
+                                        Qt.openUrlExternally(link)
+                                    }
+                                    
+                                    Component.onCompleted: {
+                                        console.log("=== Message text loaded ===")
+                                        console.log("Role:", role)
+                                        console.log("Content length:", content.length)
+                                        console.log("Content preview:", content.substring(0, 100))
+                                        console.log("Formatted text length:", text.length)
+                                        console.log("MarkdownFormatter available:", markdownFormatter !== null)
+                                    }
                                 }
                             }
                         }
@@ -843,17 +863,35 @@ ApplicationWindow {
                     color: "#27272a"
                     radius: 12
 
-                    Text {
+                    TextEdit {
                         id: streamingResponseText
                         anchors.fill: parent
                         anchors.margins: 10
-                        text: chatView.streamingResponse
-                        textFormat: Text.MarkdownText
+                        text: {
+                            if (markdownFormatter) {
+                                var formatted = markdownFormatter.format(chatView.streamingResponse)
+                                return formatted || chatView.streamingResponse
+                            }
+                            return chatView.streamingResponse
+                        }
+                        textFormat: TextEdit.RichText
                         color: "#e4e4e7"
                         font.pixelSize: 15
                         wrapMode: Text.WordWrap
-                        lineHeight: 1.4
-                        verticalAlignment: Text.AlignVCenter
+                        selectByMouse: true
+                        readOnly: true
+                        onLinkActivated: function(link) {
+                            console.log("=== Streaming link clicked ===")
+                            console.log("Link URL:", link)
+                            Qt.openUrlExternally(link)
+                        }
+                        
+                        Component.onCompleted: {
+                            console.log("=== Streaming response text loaded ===")
+                            console.log("Content length:", chatView.streamingResponse.length)
+                            console.log("Content preview:", chatView.streamingResponse.substring(0, 100))
+                            console.log("MarkdownFormatter available:", markdownFormatter !== null)
+                        }
                     }
                 }
             }

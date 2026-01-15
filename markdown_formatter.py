@@ -15,12 +15,14 @@ class MarkdownFormatter(QObject):
         
         # 格式化顺序很重要，先处理复杂的，再处理简单的
         formatted = self._format_code_blocks(formatted)
+        formatted = self._format_horizontal_rules(formatted)
         formatted = self._format_inline_code(formatted)
         formatted = self._format_bold(formatted)
         formatted = self._format_italic(formatted)
         formatted = self._format_headings(formatted)
         formatted = self._format_lists(formatted)
         formatted = self._format_links(formatted)
+        formatted = self._format_auto_links(formatted)
         formatted = self._format_newlines(formatted)
         
         return formatted
@@ -82,6 +84,16 @@ class MarkdownFormatter(QObject):
             return f'<div style="background-color: #1d1d20; border-radius: 8px; padding: 12px; margin: 8px 0;"><pre style="font-family: Consolas, Monospace; font-size: 13px; color: #e4e4e7; margin: 0; white-space: pre-wrap; overflow-x: auto;"><code>{code}</code></pre></div>'
         
         return re.sub(pattern, replace_code_block, text, flags=re.MULTILINE | re.DOTALL)
+    
+    def _format_horizontal_rules(self, text):
+        # 支持 ---, ***, ___ 三种水平线格式
+        # 匹配单独一行的 ---, ***, 或 ___（前后可以有空白）
+        pattern = r'^\s*([-*_]{3,})\s*$'
+        
+        def replace_hr(match):
+            return '<hr style="border: none; border-top: 1px solid #27272a; margin: 16px 0;">'
+        
+        return re.sub(pattern, replace_hr, text, flags=re.MULTILINE)
 
     def _format_inline_code(self, text):
         pattern = r'`([^`]+)`'
@@ -105,8 +117,21 @@ class MarkdownFormatter(QObject):
         pattern = r'\[([^\]]+)\]\(([^)]+)\)'
         
         def replace_link(match):
-            text = match.group(1)
+            link_text = match.group(1)
             url = match.group(2)
-            return f'<a href="{url}" style="color: #3b82f6; text-decoration: underline;">{text}</a>'
+            return f'<a href="{url}" style="color: #3b82f6; text-decoration: underline;">{link_text}</a>'
         
         return re.sub(pattern, replace_link, text)
+    
+    def _format_auto_links(self, text):
+        # 自动检测并格式化裸露的 URL（不在 Markdown 链接语法中的 URL）
+        # 匹配 http:// 或 https:// 开头的 URL
+        pattern = r'(?<!\])(https?://[^\s<>"{}|\\^`\[\]]+)'
+        
+        def replace_auto_link(match):
+            url = match.group(1)
+            # 限制显示的 URL 长度，避免太长
+            display_url = url if len(url) <= 50 else url[:47] + "..."
+            return f'<a href="{url}" style="color: #3b82f6; text-decoration: underline;">{display_url}</a>'
+        
+        return re.sub(pattern, replace_auto_link, text)
