@@ -1,6 +1,9 @@
 import json
 from pathlib import Path
 from PySide6.QtCore import QObject, Signal, Slot
+from logger_config import get_logger
+
+logger = get_logger('config_manager')
 
 
 class ConfigManager(QObject):
@@ -53,14 +56,14 @@ class ConfigManager(QObject):
                     loaded_config = json.load(f)
                     self._merge_config(loaded_config)
             except Exception as e:
-                print(f"Error loading config: {e}")
+                logger.error(f"加载配置失败: {e}")
 
     def save_config(self):
         try:
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(self.config, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            print(f"Error saving config: {e}")
+            logger.error(f"保存配置失败: {e}")
 
     def _merge_config(self, loaded_config):
         for section in self.config:
@@ -358,7 +361,7 @@ class ConfigManager(QObject):
         self.config['model']['custom_models'][provider].append(model_config)
         self.save_config()
         self.configChanged.emit()
-        print(f"Saved custom model: {name} for provider: {provider}")
+        logger.debug(f"保存自定义模型: {name}，供应商: {provider}")
 
     @Slot(str, result=list)
     def get_models_by_provider(self, provider):
@@ -372,7 +375,7 @@ class ConfigManager(QObject):
         self.config['model']['active_model'] = model_name
         self.save_config()
         self.configChanged.emit()
-        print(f"Set active model: {model_name}")
+        logger.debug(f"设置活动模型: {model_name}")
 
     @Slot(result=str)
     def get_active_model(self):

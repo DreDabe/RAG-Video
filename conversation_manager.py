@@ -3,6 +3,9 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 from PySide6.QtCore import QObject, Signal, Slot, Property
+from logger_config import get_logger
+
+logger = get_logger('conversation_manager')
 
 
 class ConversationManager(QObject):
@@ -59,7 +62,7 @@ class ConversationManager(QObject):
                     else:
                         self._current_conversation_id = self.conversations[0]['id'] if self.conversations else None
             except Exception as e:
-                print(f"Error loading conversations: {e}")
+                logger.error(f"加载对话失败: {e}")
                 self.conversations = []
                 self._current_conversation_id = None
                 self.create_new_conversation()
@@ -79,7 +82,7 @@ class ConversationManager(QObject):
             with open(self.conversations_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            print(f"Error saving conversations: {e}")
+            logger.error(f"保存对话失败: {e}")
 
     @Slot(result=str)
     def create_new_conversation(self):
@@ -143,41 +146,36 @@ class ConversationManager(QObject):
 
     @Slot(str)
     def delete_conversation(self, conversation_id):
-        print(f"=== Delete Conversation Called ===")
-        print(f"Conversation ID to delete (raw): {conversation_id}")
-        print(f"Conversation ID type: {type(conversation_id)}")
+        logger.debug(f"删除对话: {conversation_id}")
         
         conversation_id = str(conversation_id)
-        print(f"Conversation ID to delete (converted): {conversation_id}")
-        print(f"Conversation ID type (converted): {type(conversation_id)}")
         
         if not conversation_id or conversation_id == "":
-            print("ERROR: conversation_id is None or empty!")
+            logger.error("conversation_id 为空或None")
             return
         
-        print(f"Current conversations before delete: {len(self.conversations)}")
+        logger.debug(f"删除前对话数量: {len(self.conversations)}")
         for i, conv in enumerate(self.conversations):
-            print(f"  Conversation {i}: ID={conv['id']}, Title={conv.get('title', 'N/A')}")
+            logger.debug(f"  对话 {i}: ID={conv['id']}, Title={conv.get('title', 'N/A')}")
         
         self.conversations = [c for c in self.conversations if c['id'] != conversation_id]
         
-        print(f"Current conversations after delete: {len(self.conversations)}")
+        logger.debug(f"删除后对话数量: {len(self.conversations)}")
         
         if self._current_conversation_id == conversation_id:
             if self.conversations:
                 self._current_conversation_id = self.conversations[0]['id']
-                print(f"New current conversation ID: {self._current_conversation_id}")
+                logger.debug(f"新当前对话ID: {self._current_conversation_id}")
             else:
                 self._current_conversation_id = None
-                print("Creating new conversation because no conversations left")
+                logger.info("没有剩余对话，创建新对话")
                 self.create_new_conversation()
         
-        print("Saving conversations to file...")
+        logger.debug("保存对话到文件...")
         self.save_conversations()
-        print("Emitting signals...")
+        logger.debug("发送信号...")
         self.conversationListChanged.emit()
         self.currentConversationChanged.emit()
-        print("=== Delete Conversation Completed ===")
 
     @Slot(str, str)
     def rename_conversation(self, conversation_id, new_title):

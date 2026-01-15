@@ -9,6 +9,9 @@ from faster_whisper import WhisperModel
 from config.platform_config import get_platform_config, is_type_supported
 from config.model_config import get_model_config
 from cookie_parser import detect_cookie_format, normalize_cookie, get_cookie_format_name
+from logger_config import get_logger
+
+logger = get_logger('knowledge_updater')
 
 
 class BasePlatformHandler:
@@ -502,7 +505,7 @@ class KnowledgeUpdater(QObject):
         """记录日志"""
         self.log_buffer.append(message)
         self.logUpdated.emit(message)
-        print(message)
+        logger.info(message)
     
     def _get_handler(self, platform, type_name):
         """

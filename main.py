@@ -11,6 +11,13 @@ from config_manager import ConfigManager
 from markdown_formatter import MarkdownFormatter
 from knowledge_updater import KnowledgeUpdater
 from dify_client import DifyClient
+from logger_config import setup_logger, get_logger
+
+logger = setup_logger('digital_garden', Path(__file__).parent / 'logs' / 'app.log')
+logger.info("=" * 50)
+logger.info("Digital Garden Chat 应用程序启动")
+logger.info(f"日志文件: {Path(__file__).parent / 'logs' / 'app.log'}")
+logger.info("=" * 50)
 
 
 class ChatController(QObject):
@@ -38,22 +45,21 @@ class ChatController(QObject):
 
     @Slot(str)
     def send_message(self, text):
-        print(f"[ChatController] ========== 开始发送消息 ==========")
-        print(f"[ChatController] 用户消息: {text}")
-        print(f"[ChatController] 当前生成状态: {self.is_generating}")
+        logger.info(f"开始发送消息: {text[:100]}...")
+        logger.debug(f"当前生成状态: {self.is_generating}")
         
         if self.is_generating:
-            print("[ChatController] 正在生成中，忽略新消息")
+            logger.warning("正在生成中，忽略新消息")
             return
         
         current_conv = self.conversation_manager.get_current_conversation()
         if not current_conv:
-            print("[ChatController] 当前没有对话，创建新对话")
+            logger.info("当前没有对话，创建新对话")
             conversation_id = self.conversation_manager.create_new_conversation()
-            print(f"[ChatController] 新对话ID: {conversation_id}")
+            logger.debug(f"新对话ID: {conversation_id}")
         else:
             conversation_id = current_conv['id']
-        print(f"[ChatController] 对话ID: {conversation_id}")
+        logger.debug(f"对话ID: {conversation_id}")
         
         self.conversation_manager.add_message(conversation_id, "user", text)
         self.messageAdded.emit()
@@ -66,53 +72,51 @@ class ChatController(QObject):
         
         def generate_response():
             try:
-                print("[ChatController] ========== 开始生成响应 ==========")
+                logger.info("开始生成响应")
                 
                 if self.should_stop:
-                    print("[ChatController] 用户请求停止生成")
+                    logger.info("用户请求停止生成")
                     return
                 
                 if not self.config_manager:
-                    print("[ChatController] 错误: ConfigManager未初始化")
+                    logger.error("ConfigManager未初始化")
                     raise Exception("ConfigManager未初始化")
                 
-                print("[ChatController] 获取Dify API Key...")
+                logger.debug("获取Dify API Key...")
                 api_key = self.config_manager.get_app_api()
-                print(f"[ChatController] API Key: {api_key[:10] if api_key else 'None'}...")
+                logger.debug(f"API Key: {api_key[:10] if api_key else 'None'}...")
                 
                 if not api_key:
-                    print("[ChatController] 错误: Dify API Key未配置")
+                    logger.error("Dify API Key未配置")
                     raise Exception("Dify API Key未配置，请在设置中配置API Key")
                 
-                print("[ChatController] 获取Dify Base URL...")
+                logger.debug("获取Dify Base URL...")
                 base_url = self.config_manager.get_app_url()
-                print(f"[ChatController] Base URL: {base_url}")
+                logger.debug(f"Base URL: {base_url}")
                 
                 if not base_url:
-                    print("[ChatController] 使用默认Base URL")
+                    logger.info("使用默认Base URL")
                     base_url = "https://api.dify.ai/v1"
                 
-                print("[ChatController] 创建DifyClient...")
+                logger.debug("创建DifyClient...")
                 self.dify_client = DifyClient(api_key, base_url)
                 
                 user_id = "digital-garden-user"
-                print(f"[ChatController] 发送消息到Dify...")
-                print(f"[ChatController] User ID: {user_id}")
-                print(f"[ChatController] Dify Conversation ID: {self.dify_conversation_id}")
+                logger.info(f"发送消息到Dify，User ID: {user_id}")
+                logger.debug(f"Dify Conversation ID: {self.dify_conversation_id}")
                 
                 def on_message_chunk(chunk):
-                    print(f"[ChatController] 收到消息片段: {chunk[:50]}...")
+                    logger.debug(f"收到消息片段: {chunk[:50]}...")
                     self.current_answer += chunk
                     self.messageChunkReceived.emit(chunk)
                 
                 def on_finished():
-                    print("[ChatController] ========== 响应生成完成 ==========")
-                    print(f"[ChatController] 完整答案: {self.current_answer[:100]}...")
+                    logger.info("响应生成完成")
+                    logger.debug(f"完整答案: {self.current_answer[:100]}...")
                     
                     self.dify_conversation_id = self.dify_client.get_conversation_id({})
-                    print(f"[ChatController] Dify Conversation ID: {self.dify_conversation_id}")
+                    logger.debug(f"Dify Conversation ID: {self.dify_conversation_id}")
                     
-                    print("[ChatController] 发送消息到UI...")
                     self.messageReceived.emit(self.current_answer)
                     self.conversation_manager.add_message(conversation_id, "assistant", self.current_answer)
                     self.messageAdded.emit()
@@ -123,8 +127,7 @@ class ChatController(QObject):
                     self.current_answer = ""
                 
                 def on_error(error_msg):
-                    print(f"[ChatController] ========== 生成响应失败 ==========")
-                    print(f"[ChatController] 错误信息: {error_msg}")
+                    logger.error(f"生成响应失败: {error_msg}")
                     
                     error_message = f"抱歉，发生了错误：{error_msg}"
                     self.messageReceived.emit(error_message)
@@ -147,15 +150,13 @@ class ChatController(QObject):
                 )
                 
                 if self.should_stop:
-                    print("[ChatController] 用户请求停止生成")
+                    logger.info("用户请求停止生成")
                     return
                 
             except Exception as e:
-                print(f"[ChatController] ========== 生成响应失败 ==========")
-                print(f"[ChatController] 错误类型: {type(e).__name__}")
-                print(f"[ChatController] 错误信息: {str(e)}")
+                logger.error(f"生成响应失败: {type(e).__name__}: {str(e)}")
                 import traceback
-                print(f"[ChatController] 堆栈跟踪:\n{traceback.format_exc()}")
+                logger.debug(f"堆栈跟踪:\n{traceback.format_exc()}")
                 
                 error_message = f"抱歉，发生了错误：{str(e)}"
                 self.messageReceived.emit(error_message)
@@ -166,35 +167,36 @@ class ChatController(QObject):
                 self.loadingStateChanged.emit(False)
                 self.current_answer = ""
         
-        print("[ChatController] 启动生成线程...")
+        logger.debug("启动生成线程...")
         thread = threading.Thread(target=generate_response)
         thread.daemon = True
         thread.start()
-        print("[ChatController] 线程已启动")
+        logger.debug("线程已启动")
 
     @Slot()
     def stop_generation(self):
-        print("[ChatController] ========== 停止生成 ==========")
+        logger.info("停止生成")
         
         if not self.is_generating:
-            print("[ChatController] 当前没有正在进行的生成")
+            logger.warning("当前没有正在进行的生成")
             return
         
         self.should_stop = True
-        print("[ChatController] 已设置停止标志")
+        logger.debug("已设置停止标志")
         
         if self.dify_client:
-            print("[ChatController] 调用Dify停止API...")
+            logger.debug("调用Dify停止API...")
             success = self.dify_client.stop_generation()
             if success:
-                print("[ChatController] Dify停止API调用成功")
+                logger.info("Dify停止API调用成功")
             else:
-                print("[ChatController] Dify停止API调用失败，但本地已停止")
-        
-        print("[ChatController] ========== 停止完成 ==========")
+                logger.warning("Dify停止API调用失败，但本地已停止")
 
 
 if __name__ == "__main__":
+    import os
+    os.environ['QT_LOGGING_RULES'] = '*.debug=false;qt.core.io.debug=false'
+    
     QQuickStyle.setStyle("Basic")
     app = QGuiApplication(sys.argv)
     engine = QQmlApplicationEngine()
