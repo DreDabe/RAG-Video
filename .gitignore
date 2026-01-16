@@ -90,6 +90,10 @@ utils/whisper/models--*/
 # Data files
 data/
 
+# Logs and test data
+logs/
+test_data/
+
 # Doc files (keep only README.md)
 doc/**/*.md
 !doc/README.md

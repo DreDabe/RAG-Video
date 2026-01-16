@@ -35,7 +35,6 @@ class ChatController(QObject):
         self.markdown_formatter = MarkdownFormatter()
         self.is_generating = False
         self.should_stop = False
-        self.dify_conversation_id = None
         self.dify_client = None
         self.current_answer = ""
 
@@ -103,7 +102,12 @@ class ChatController(QObject):
                 
                 user_id = "digital-garden-user"
                 logger.info(f"发送消息到Dify，User ID: {user_id}")
-                logger.debug(f"Dify Conversation ID: {self.dify_conversation_id}")
+                
+                current_conv = self.conversation_manager.get_current_conversation()
+                dify_conversation_id = None
+                if current_conv:
+                    dify_conversation_id = self.conversation_manager.get_dify_conversation_id(current_conv['id'])
+                logger.debug(f"Dify Conversation ID: {dify_conversation_id}")
                 
                 def on_message_chunk(chunk):
                     logger.debug(f"收到消息片段: {chunk[:50]}...")
@@ -114,8 +118,11 @@ class ChatController(QObject):
                     logger.info("响应生成完成")
                     logger.debug(f"完整答案: {self.current_answer[:100]}...")
                     
-                    self.dify_conversation_id = self.dify_client.get_conversation_id({})
-                    logger.debug(f"Dify Conversation ID: {self.dify_conversation_id}")
+                    dify_conversation_id = self.dify_client.get_conversation_id({})
+                    logger.debug(f"Dify Conversation ID: {dify_conversation_id}")
+                    
+                    if dify_conversation_id:
+                        self.conversation_manager.update_dify_conversation_id(conversation_id, dify_conversation_id)
                     
                     self.messageReceived.emit(self.current_answer)
                     self.conversation_manager.add_message(conversation_id, "assistant", self.current_answer)
@@ -142,7 +149,7 @@ class ChatController(QObject):
                 response = self.dify_client.send_message(
                     query=text,
                     user=user_id,
-                    conversation_id=self.dify_conversation_id,
+                    conversation_id=dify_conversation_id,
                     response_mode="streaming",
                     on_message=on_message_chunk,
                     on_finished=on_finished,

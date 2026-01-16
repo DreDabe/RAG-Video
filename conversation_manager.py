@@ -1,8 +1,8 @@
-import json
 import uuid
 from datetime import datetime
 from pathlib import Path
 from PySide6.QtCore import QObject, Signal, Slot, Property
+from database_manager import DatabaseManager
 from logger_config import get_logger
 
 logger = get_logger('conversation_manager')
@@ -14,11 +14,7 @@ class ConversationManager(QObject):
 
     def __init__(self, data_dir=None):
         super().__init__()
-        self.data_dir = Path(data_dir) if data_dir else Path(__file__).parent / "data"
-        self.data_dir.mkdir(exist_ok=True)
-        
-        self.conversations_file = self.data_dir / "conversations.json"
-        self.conversations = []
+        self.db = DatabaseManager(data_dir)
         self._current_conversation_id = None
         
         self.load_conversations()
@@ -34,72 +30,38 @@ class ConversationManager(QObject):
             self.currentConversationChanged.emit()
 
     def load_conversations(self):
-        if self.conversations_file.exists():
-            try:
-                with open(self.conversations_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    self.conversations = data.get('conversations', [])
-                    # 清理空对话，只保留一个空对话
-                    empty_conversations = [c for c in self.conversations if not c.get('title') or c['title'].strip() == '']
-                    if len(empty_conversations) > 1:
-                        # 保留最新的空对话，删除其他空对话
-                        latest_empty = empty_conversations[0]
-                        self.conversations = [c for c in self.conversations if c.get('title') and c['title'].strip() != ''] + [latest_empty]
-                    
-                    # 如果没有对话，创建一个新对话
-                    if not self.conversations:
-                        self.create_new_conversation()
-                    
-                    # 设置当前对话ID
-                    saved_current_id = data.get('current_conversation_id')
-                    if saved_current_id:
-                        # 检查保存的对话ID是否仍然存在
-                        if any(c['id'] == saved_current_id for c in self.conversations):
-                            self._current_conversation_id = saved_current_id
-                        else:
-                            # 如果保存的对话不存在，使用第一个对话
-                            self._current_conversation_id = self.conversations[0]['id'] if self.conversations else None
-                    else:
-                        self._current_conversation_id = self.conversations[0]['id'] if self.conversations else None
-            except Exception as e:
-                logger.error(f"加载对话失败: {e}")
-                self.conversations = []
-                self._current_conversation_id = None
+        try:
+            saved_current_id = self.db.get_current_conversation_id()
+            
+            if self.db.get_conversation_count() == 0:
+                logger.info("没有找到对话，创建新对话")
                 self.create_new_conversation()
-        else:
-            self.conversations = []
+            else:
+                if saved_current_id and self.db.get_conversation(saved_current_id):
+                    self._current_conversation_id = saved_current_id
+                else:
+                    first_conv = self.db.get_all_conversations()
+                    if first_conv:
+                        self._current_conversation_id = first_conv[0]['id']
+                    else:
+                        self.create_new_conversation()
+            
+            self.conversationListChanged.emit()
+            
+        except Exception as e:
+            logger.error(f"加载对话失败: {e}")
             self._current_conversation_id = None
             self.create_new_conversation()
-        
-        self.conversationListChanged.emit()
-
-    def save_conversations(self):
-        try:
-            data = {
-                'conversations': self.conversations,
-                'current_conversation_id': self.current_conversation_id
-            }
-            with open(self.conversations_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            logger.error(f"保存对话失败: {e}")
 
     @Slot(result=str)
     def create_new_conversation(self):
-        conversation_id = str(uuid.uuid4())
-        new_conversation = {
-            'id': conversation_id,
-            'title': '',
-            'messages': [],
-            'created_at': datetime.now().isoformat(),
-            'updated_at': datetime.now().isoformat()
-        }
-        
-        self.conversations.insert(0, new_conversation)
+        conversation_id = self.db.create_conversation('')
         self._current_conversation_id = conversation_id
-        self.save_conversations()
+        self.db.set_current_conversation_id(conversation_id)
         self.conversationListChanged.emit()
         self.currentConversationChanged.emit()
+        
+        logger.debug(f"创建新对话: {conversation_id}")
         
         return conversation_id
 
@@ -107,38 +69,28 @@ class ConversationManager(QObject):
     def add_message(self, conversation_id, role, content):
         conversation = self.get_conversation(conversation_id)
         if conversation:
-            message = {
-                'role': role,
-                'content': content,
-                'timestamp': datetime.now().isoformat()
-            }
-            conversation['messages'].append(message)
+            self.db.add_message(conversation_id, role, content)
             
             if not conversation['title'] and role == 'user':
-                conversation['title'] = content
+                self.db.update_conversation_title(conversation_id, content)
             
-            conversation['updated_at'] = datetime.now().isoformat()
-            
-            self._sort_conversations()
-            self.save_conversations()
             self.conversationListChanged.emit()
+            logger.debug(f"添加消息到对话 {conversation_id}: {role}")
 
     @Slot(str, str)
     def update_title(self, conversation_id, title):
         conversation = self.get_conversation(conversation_id)
         if conversation:
-            conversation['title'] = title
-            conversation['updated_at'] = datetime.now().isoformat()
-            
-            self._sort_conversations()
-            self.save_conversations()
+            self.db.update_conversation_title(conversation_id, title)
             self.conversationListChanged.emit()
+            logger.debug(f"更新对话标题: {conversation_id} -> {title}")
 
     @Slot(str)
     def load_conversation(self, conversation_id):
         conversation = self.get_conversation(conversation_id)
         if conversation:
             self._current_conversation_id = conversation_id
+            self.db.set_current_conversation_id(conversation_id)
             self.currentConversationChanged.emit()
             
             return conversation
@@ -151,29 +103,22 @@ class ConversationManager(QObject):
         conversation_id = str(conversation_id)
         
         if not conversation_id or conversation_id == "":
-            logger.error("conversation_id 为空或None")
+            logger.error("conversation_id为空")
             return
         
-        logger.debug(f"删除前对话数量: {len(self.conversations)}")
-        for i, conv in enumerate(self.conversations):
-            logger.debug(f"  对话 {i}: ID={conv['id']}, Title={conv.get('title', 'N/A')}")
-        
-        self.conversations = [c for c in self.conversations if c['id'] != conversation_id]
-        
-        logger.debug(f"删除后对话数量: {len(self.conversations)}")
+        self.db.delete_conversation(conversation_id)
         
         if self._current_conversation_id == conversation_id:
-            if self.conversations:
-                self._current_conversation_id = self.conversations[0]['id']
-                logger.debug(f"新当前对话ID: {self._current_conversation_id}")
+            first_conv = self.db.get_all_conversations()
+            if first_conv:
+                self._current_conversation_id = first_conv[0]['id']
+                self.db.set_current_conversation_id(self._current_conversation_id)
+                logger.debug(f"切换到新对话: {self._current_conversation_id}")
             else:
                 self._current_conversation_id = None
-                logger.info("没有剩余对话，创建新对话")
+                logger.debug("没有对话了，创建新对话")
                 self.create_new_conversation()
         
-        logger.debug("保存对话到文件...")
-        self.save_conversations()
-        logger.debug("发送信号...")
         self.conversationListChanged.emit()
         self.currentConversationChanged.emit()
 
@@ -181,18 +126,12 @@ class ConversationManager(QObject):
     def rename_conversation(self, conversation_id, new_title):
         conversation = self.get_conversation(conversation_id)
         if conversation:
-            conversation['title'] = new_title
-            conversation['updated_at'] = datetime.now().isoformat()
-            
-            self._sort_conversations()
-            self.save_conversations()
+            self.db.update_conversation_title(conversation_id, new_title)
             self.conversationListChanged.emit()
+            logger.debug(f"重命名对话: {conversation_id} -> {new_title}")
 
     def get_conversation(self, conversation_id):
-        for conversation in self.conversations:
-            if conversation['id'] == conversation_id:
-                return conversation
-        return None
+        return self.db.get_conversation(conversation_id)
 
     def get_current_conversation(self):
         if self.current_conversation_id:
@@ -200,28 +139,17 @@ class ConversationManager(QObject):
         return None
 
     def _sort_conversations(self):
-        self.conversations.sort(
-            key=lambda x: x['updated_at'],
-            reverse=True
-        )
+        pass
 
     @Slot(result=list)
     def get_conversation_list(self):
-        return [
-            {
-                'id': c['id'],
-                'title': c['title'],
-                'updated_at': c['updated_at']
-            }
-            for c in self.conversations
-            if c.get('title') and c['title'].strip() != ''
-        ]
+        return self.db.get_conversation_list()
 
     @Slot(result=list)
     def get_current_messages(self):
         conversation = self.get_current_conversation()
         if conversation:
-            return conversation['messages']
+            return conversation.get('messages', [])
         return []
     
     @Slot(result=bool)
@@ -230,14 +158,15 @@ class ConversationManager(QObject):
     
     @Slot(result=bool)
     def has_empty_title_conversation(self):
-        for conv in self.conversations:
-            if not conv.get('title') or conv['title'].strip() == '':
-                return True
-        return False
+        return self.db.has_empty_title_conversation()
     
     @Slot(result=str)
     def get_empty_title_conversation_id(self):
-        for conv in self.conversations:
-            if not conv.get('title') or conv['title'].strip() == '':
-                return conv['id']
-        return ""
+        return self.db.get_empty_title_conversation_id()
+    
+    def update_dify_conversation_id(self, conversation_id, dify_conversation_id):
+        self.db.update_dify_conversation_id(conversation_id, dify_conversation_id)
+        logger.debug(f"更新Dify对话ID: {conversation_id} -> {dify_conversation_id}")
+    
+    def get_dify_conversation_id(self, conversation_id):
+        return self.db.get_dify_conversation_id(conversation_id)
