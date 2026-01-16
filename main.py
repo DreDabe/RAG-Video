@@ -206,6 +206,12 @@ if __name__ == "__main__":
     
     QQuickStyle.setStyle("Basic")
     app = QGuiApplication(sys.argv)
+    
+    # 设置应用程序图标
+    from PySide6.QtGui import QIcon
+    app_icon = QIcon("img/仓鼠.svg")
+    app.setWindowIcon(app_icon)
+    
     engine = QQmlApplicationEngine()
 
     config_manager = ConfigManager()
