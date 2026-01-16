@@ -27,7 +27,12 @@ class DifyClient:
         on_finished: Optional[Callable[[], None]] = None,
         on_error: Optional[Callable[[str], None]] = None
     ) -> Dict[str, Any]:
-        url = f"{self.base_url}/chat-messages"
+        # 检查base_url是否已经包含/chat-messages路径
+        if self.base_url.endswith('/chat-messages'):
+            url = self.base_url
+        else:
+            url = f"{self.base_url}/chat-messages"
+        logger.debug(f"最终请求URL: {url}")
         
         logger.debug(f"准备发送请求到: {url}")
         logger.debug(f"API Key: {self.api_key[:10]}...")
@@ -50,10 +55,16 @@ class DifyClient:
         
         try:
             logger.info("开始发送请求...")
+            logger.debug(f"最终构造的URL: {url}")
+            logger.debug(f"请求方法: POST")
+            logger.debug(f"请求头: {json.dumps(self.headers, ensure_ascii=False)}")
+            logger.debug(f"请求体: {json.dumps(payload, ensure_ascii=False)}")
             
             if response_mode == "streaming":
+                logger.info("使用流式请求模式")
                 return self._send_streaming_request(url, payload, on_message, on_finished, on_error)
             else:
+                logger.info("使用阻塞请求模式")
                 return self._send_blocking_request(url, payload)
                 
         except requests.exceptions.Timeout:
@@ -64,8 +75,11 @@ class DifyClient:
             raise Exception(f"Dify API连接失败: {str(e)}")
         except requests.exceptions.HTTPError as e:
             logger.error(f"HTTP错误: {str(e)}")
-            logger.debug(f"响应内容: {response.text}")
-            raise Exception(f"Dify API HTTP错误: {response.status_code} - {response.text}")
+            if hasattr(e, 'response'):
+                logger.debug(f"响应内容: {e.response.text}")
+                raise Exception(f"Dify API HTTP错误: {e.response.status_code} - {e.response.text}")
+            else:
+                raise Exception(f"Dify API HTTP错误: {str(e)}")
         except requests.exceptions.RequestException as e:
             logger.error(f"请求异常: {str(e)}")
             raise Exception(f"Dify API请求失败: {str(e)}")

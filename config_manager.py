@@ -19,7 +19,7 @@ class ConfigManager(QObject):
             'dify': {
                 'dataset_api': 'dataset-nCFE6gRoqoLnb5Vdn3O3vPc0',
                 'dataset_id': '440bcad8-f7b1-4804-bae3-2ff47e268fee',
-                'app_url': 'http://localhost/v1/chat-messages',
+                'app_url': 'http://localhost/v1',
                 'app_api': 'app-V2QqKcBG5msVqGCxPIgm2fR3'
             },
             'general': {

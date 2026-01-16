@@ -22,7 +22,7 @@ class DatabaseManager:
     
     def _get_connection(self):
         if self._connection is None:
-            self._connection = sqlite3.connect(str(self.db_path))
+            self._connection = sqlite3.connect(str(self.db_path), check_same_thread=False)
             self._connection.row_factory = sqlite3.Row
         return self._connection
     
